@@ -1,0 +1,27 @@
+# Python caches
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+.venv/
+venv/
+
+# Tool caches
+.ruff_cache/
+.pytest_cache/
+
+# Local environment
+.env
+
+# Generated pipeline data
+data/*.db
+data/*.jsonl
+data/pipeline.log
+
+# Generated reports
+data/daily_board.md
+data/top_outlines.md
+data/research_pack.json
+# Node dependencies
+node_modules/
+feeds.txt

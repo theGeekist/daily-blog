@@ -1,0 +1,27 @@
+# Pre-commit hooks for daily-blog
+# See https://pre-commit.com for more information
+
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.0
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+      - id: ruff-format
+
+  - repo: https://github.com/detachhead/basedpyright
+    rev: v1.31.0
+    hooks:
+      - id: basedpyright
+        additional_dependencies: []
+
+# Exclude common generated and cache directories
+exclude: |
+  (?x)(
+      ^\.venv/|
+      ^venv/|
+      ^__pycache__/|
+      ^\.ruff_cache/|
+      ^\.pytest_cache/|
+      ^data/.*\.(db|jsonl)$
+  )

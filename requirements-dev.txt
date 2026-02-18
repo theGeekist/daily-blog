@@ -1,0 +1,2 @@
+basedpyright>=1.31.0
+ruff>=0.12.0

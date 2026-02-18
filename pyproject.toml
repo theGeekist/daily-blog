@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "daily-blog"
+version = "0.1.0"
+description = "RSS-first pipeline for daily topic discovery and editorial prep"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+
+[tool.basedpyright]
+pythonVersion = "3.11"
+typeCheckingMode = "basic"
+exclude = [
+  ".venv",
+  "venv",
+  "__pycache__",
+  ".ruff_cache",
+  "data",
+]
