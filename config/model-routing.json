@@ -1,0 +1,50 @@
+{
+  "coordinator": {
+    "primary": "codex-5.3",
+    "fallback": "gemini-3-pro"
+  },
+  "extractor": {
+    "primary": "ollama:qwen2.5:7b",
+    "fallback": "gemini-3-pro",
+    "local_candidates": [
+      "ollama:qwen2.5:7b",
+      "ollama:qwen2.5:14b",
+      "ollama:llama3.1:8b"
+    ]
+  },
+  "topic_lifter": {
+    "primary": "ollama:qwen2.5:14b",
+    "fallback": "ollama:qwen2.5:7b",
+    "local_candidates": [
+      "ollama:qwen2.5:14b",
+      "ollama:qwen2.5:7b",
+      "ollama:llama3.1:8b"
+    ]
+  },
+  "topic_curator": {
+    "primary": "ollama:qwen2.5:7b",
+    "fallback": "ollama:llama3.1:8b",
+    "local_candidates": [
+      "ollama:qwen2.5:7b",
+      "ollama:llama3.1:8b",
+      "ollama:mistral-nemo:12b"
+    ]
+  },
+  "enrichment": {
+    "primary": "codex-5.3",
+    "fallback": "glm5"
+  },
+  "editorial": {
+    "primary": "ollama:qwen2.5:14b",
+    "fallback": "codex-5.3",
+    "local_candidates": [
+      "ollama:qwen2.5:14b",
+      "ollama:llama3.1:8b",
+      "ollama:mistral-nemo:12b"
+    ]
+  },
+  "ranker": {
+    "primary": "deterministic-code",
+    "fallback": "deterministic-code"
+  }
+}

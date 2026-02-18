@@ -1,0 +1,4 @@
+- `extract_claims.py` uses simple heuristics for claim extraction; future stages will refactor this to use LLMs.
+- `lift_topics.py` uses keyword-based topic detection; future stages will refactor this to use clustering or LLMs.
+- `enrich_topics.py` uses simple domain-based credibility scoring; future stages will enhance this.
+- `generate_editorial.py` uses a static template for outlines; future stages will use LLMs for dynamic generation.

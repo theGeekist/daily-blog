@@ -1,0 +1,4 @@
+- Chose `unittest.TestCase` for consistency with existing tests.
+- Decided to use `subprocess.run` to test scripts as standalone units, ensuring they can be run from the command line.
+- Created a separate script `tests/create_fixture_db.py` to generate a deterministic database for E2E testing, which can be reused across different test suites.
+- Used `file://` URLs in `test_ingest.py` to avoid network dependency while testing the ingestion logic.

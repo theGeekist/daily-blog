@@ -1,0 +1,101 @@
+{
+  "hard_rules": {
+    "min_title_length": 20,
+    "blocked_title_keywords": [
+      "hiring",
+      "who is hiring",
+      "weekly thread",
+      "daily discussion"
+    ],
+    "max_candidates": 12,
+    "max_per_topic": 3,
+    "min_final_score": 0.25
+  },
+  "novelty": {
+    "novel_days": 3,
+    "recent_days": 14,
+    "novel_score": 1.0,
+    "recent_score": 0.6,
+    "stale_score": 0.2
+  },
+  "weights": {
+    "novelty": 0.3,
+    "recency": 0.2,
+    "corroboration": 0.2,
+    "source_diversity": 0.15,
+    "actionability": 0.15
+  },
+  "topics": {
+    "ai": [
+      "ai",
+      "llm",
+      "model",
+      "gpt",
+      "inference",
+      "agent"
+    ],
+    "engineering": [
+      "programming",
+      "dev",
+      "bug",
+      "release",
+      "build",
+      "refactor"
+    ],
+    "web": [
+      "javascript",
+      "react",
+      "css",
+      "html",
+      "frontend",
+      "backend"
+    ],
+    "business": [
+      "sales",
+      "pricing",
+      "startup",
+      "market",
+      "growth",
+      "revenue"
+    ],
+    "language": [
+      "linguistics",
+      "etymology",
+      "language",
+      "grammar",
+      "phonology"
+    ]
+  },
+  "actionability_keywords": [
+    "how to",
+    "guide",
+    "playbook",
+    "template",
+    "checklist",
+    "workflow",
+    "steps"
+  ],
+  "evidence_thresholds": {
+    "min_sources": 3,
+    "min_fetched_ratio": 0.5,
+    "min_avg_credibility_score": 2.0,
+    "warn_min_fetched_ratio": 0.7,
+    "warn_min_avg_credibility_score": 3.0,
+    "min_domain_diversity": 2,
+    "block_anecdote_without_min_sources": true
+  },
+  "evidence_fail_states": {
+    "BLOCK": {
+      "ui_state": "BLOCKED: INSUFFICIENT EVIDENCE",
+      "output_suppressed": true
+    },
+    "WARN": {
+      "ui_state": "WEAK EVIDENCE",
+      "output_suppressed": false
+    },
+    "PASS": {
+      "ui_state": "EVIDENCE VERIFIED",
+      "output_suppressed": false
+    }
+  }
+}

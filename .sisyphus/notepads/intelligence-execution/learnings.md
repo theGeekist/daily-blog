@@ -1,0 +1,5 @@
+- Use `tempfile.TemporaryDirectory` for isolated test environments.
+- Mock network calls by using `file://` URLs for RSS feeds in tests.
+- Environment variables are a clean way to inject test configurations (DB path, config path) into scripts.
+- `subprocess.run` is effective for testing standalone scripts as black boxes.
+- Deterministic fixture databases are essential for E2E testing of pipeline stages.

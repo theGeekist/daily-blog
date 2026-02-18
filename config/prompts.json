@@ -1,0 +1,27 @@
+{
+  "extractor": {
+    "prefix": "",
+    "suffix": "",
+    "template": ""
+  },
+  "topic_lifter": {
+    "prefix": "",
+    "suffix": "",
+    "template": ""
+  },
+  "topic_curator": {
+    "prefix": "",
+    "suffix": "",
+    "template": ""
+  },
+  "enrichment": {
+    "prefix": "",
+    "suffix": "",
+    "template": ""
+  },
+  "editorial": {
+    "prefix": "",
+    "suffix": "",
+    "template": ""
+  }
+}

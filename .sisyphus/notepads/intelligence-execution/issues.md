@@ -1,0 +1,3 @@
+- `ingest_rss.py` uses `urllib.request.urlopen`, which supports `file://` URLs, making it easy to test without network access.
+- `score_rss.py` returns 2 if no mentions are found, which is a good signal for tests to verify.
+- `lift_topics.py` uses slugs as topic IDs, which is deterministic for fixed inputs.
