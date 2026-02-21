@@ -1,0 +1,20 @@
+{
+  "name": "daily-blog",
+  "version": "1.0.0",
+  "description": "RSS-first pipeline for daily topic discovery, evidence gathering, and editorial drafting.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@shoelace-style/shoelace": "^2.20.1"
+  }
+}

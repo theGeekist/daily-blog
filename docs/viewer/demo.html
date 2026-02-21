@@ -1,0 +1,937 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Component Kitchen Sink - Daily Blog</title>
+  <link rel="stylesheet" href="/docs/viewer/components/shared.css">
+  <style>
+    :root {
+      --bg: #f5f7fa;
+      --panel: #ffffff;
+      --line: #d7dce5;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --accent: #0e60c8;
+      --ok: #0f8a4b;
+      --warn: #b15f00;
+      --bad: #b42318;
+    }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      padding: 20px;
+    }
+
+    header {
+      max-width: 1200px;
+      margin: 0 auto 20px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 24px;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    main {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: grid;
+      gap: 20px;
+    }
+
+    section {
+      display: grid;
+      gap: 10px;
+    }
+
+    section h2 {
+      margin: 0;
+      font-size: 16px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 8px;
+    }
+
+    .demo-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 10px;
+    }
+
+    .demo-full {
+      display: grid;
+      gap: 10px;
+    }
+
+    /* Control panel for interactivity */
+    .controls {
+      position: sticky;
+      top: 10px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      z-index: 100;
+    }
+
+    .controls h3 {
+      margin: 0 0 8px;
+      font-size: 14px;
+    }
+
+    .controls button {
+      margin-right: 8px;
+      margin-bottom: 4px;
+      padding: 6px 10px;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      background: var(--panel);
+      cursor: pointer;
+      font-size: 12px;
+      transition: all 150ms ease;
+    }
+
+    .controls button:hover {
+      border-color: #9cb3d6;
+      background: #f7fbff;
+    }
+
+    .controls button:active {
+      transform: translateY(1px);
+    }
+
+    code {
+      background: #e8edf5;
+      padding: 2px 4px;
+      border-radius: 3px;
+      font-family: ui-monospace, monospace;
+      font-size: 12px;
+    }
+
+    /* Demo-specific overrides */
+    .controls button {
+      margin-right: 8px;
+      margin-bottom: 4px;
+      padding: 6px 10px;
+      border: 1px solid var(--db-line);
+      border-radius: 4px;
+      background: var(--db-panel);
+      cursor: pointer;
+      font-size: 12px;
+      transition: all var(--db-transition-fast);
+    }
+
+    .controls button:hover {
+      border-color: #9cb3d6;
+      background: #f7fbff;
+    }
+
+    .controls button:active {
+      transform: translateY(1px);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Component Kitchen Sink</h1>
+    <p class="subtitle">Interactive demo of all Daily Blog UI components</p>
+  </header>
+
+  <div class="controls">
+    <h3>Quick Actions</h3>
+    <button onclick="expandAll()">Expand All Cards</button>
+    <button onclick="collapseAll()">Collapse All Cards</button>
+    <button onclick="resetDemo()">Reset Demo</button>
+  </div>
+
+  <main>
+    <!-- KPI Strips Section -->
+    <section>
+      <h2>1. KPI Strips & Items</h2>
+      <div class="demo-grid">
+        <db-card title="Basic KPI Strip" summary="Shows key metrics in compact format">
+          <div slot="content">
+            <db-kpi-strip>
+              <db-kpi-item label="Run" value="20250219T104212Z"></db-kpi-item>
+              <db-kpi-item label="Status" value="ok" variant="ok"></db-kpi-item>
+              <db-kpi-item label="Claims" value="45"></db-kpi-item>
+              <db-kpi-item label="Topics" value="8"></db-kpi-item>
+            </db-kpi-strip>
+          </div>
+        </db-card>
+
+        <db-card title="KPI Strip with Variants" summary="Shows ok/warn/bad status variants">
+          <div slot="content">
+            <db-kpi-strip>
+              <db-kpi-item label="System" value="healthy" variant="ok"></db-kpi-item>
+              <db-kpi-item label="Warnings" value="3" variant="warn"></db-kpi-item>
+              <db-kpi-item label="Errors" value="0" variant="bad"></db-kpi-item>
+            </db-kpi-strip>
+          </div>
+        </db-card>
+
+        <db-card title="KPI Strip with Separator" summary="Uses custom separator">
+          <div slot="content">
+            <db-kpi-strip separator="•">
+              <db-kpi-item label="Stage" value="extract_claims"></db-kpi-item>
+              <db-kpi-item label="Duration" value="2.3s"></db-kpi-item>
+              <db-kpi-item label="Model" value="gpt-4"></db-kpi-item>
+            </db-kpi-strip>
+          </div>
+        </db-card>
+      </div>
+    </section>
+
+    <!-- Cards Section -->
+    <section>
+      <h2>2. Card States & Accordion Groups</h2>
+      <div class="demo-full">
+        <div class="demo-grid">
+          <db-card
+            title="Collapsed Card"
+            summary="Click to expand and see full content"
+            collapsible-group="demo-accordion">
+            <div slot="content">
+              <p style="margin: 0 0 10px; color: var(--muted); font-size: 14px;">
+                This is the full content revealed when expanded. Cards can contain any HTML.
+              </p>
+              <button style="padding: 6px 10px; border: 1px solid var(--line); border-radius: 4px; cursor: pointer;">
+                Action Button
+              </button>
+            </div>
+          </db-card>
+
+          <db-card
+            title="Expanded Card"
+            summary="Already expanded on load"
+            expanded
+            collapsible-group="demo-accordion">
+            <div slot="content">
+              <p style="margin: 0 0 10px; color: var(--muted); font-size: 14px;">
+                This card starts expanded. Notice how the other cards in the accordion group collapse when this one expands.
+              </p>
+              <db-kpi-strip>
+                <db-kpi-item label="Metric 1" value="123"></db-kpi-item>
+                <db-kpi-item label="Metric 2" value="456" variant="ok"></db-kpi-item>
+              </db-kpi-strip>
+            </div>
+          </db-card>
+
+          <db-card
+            title="Non-Expandable Card"
+            summary="No toggle, always shows content"
+            non-expandable>
+            <div slot="content">
+              <p style="margin: 0; color: var(--muted); font-size: 14px;">
+                This card cannot be collapsed. Useful for static content that should always be visible.
+              </p>
+            </div>
+          </db-card>
+        </div>
+
+        <db-card
+          title="Accordions work across groups"
+          summary="These cards share 'demo-accordion' group - only one expands at a time">
+          <div slot="content">
+            <p style="margin: 0; color: var(--muted); font-size: 14px;">
+              Try expanding the cards above - this one will collapse automatically when they expand.
+              This is controlled by the <code>collapsible-group</code> attribute.
+            </p>
+          </div>
+        </db-card>
+      </div>
+    </section>
+
+    <!-- Tabs Section -->
+    <section>
+      <h2>3. Tabs & Tab Panels</h2>
+      <div class="demo-grid">
+        <db-tabs active-tab="narrative">
+          <db-tab-panel name="narrative" label="Narrative">
+            <db-detail-pane label="Narrative Analysis" expanded>
+              <db-kpi-item label="Who Cares" value="Tech policy makers"></db-kpi-item>
+              <db-kpi-item label="Problem" value="Regulation pressure"></db-kpi-item>
+              <db-kpi-item label="Solution" value="Compliance guide"></db-kpi-item>
+              <div slot="full">
+                <h4 style="margin: 0 0 10px;">Full Narrative Content</h4>
+                <p style="margin: 0; color: var(--muted); font-size: 14px; line-height: 1.5;">
+                  Tech policy makers are facing new challenges with the EU AI Act implementation.
+                  Startup founders need clarity on compliance requirements, while compliance officers
+                  are seeking practical guidance for classification and risk assessment.
+                </p>
+              </div>
+            </db-detail-pane>
+          </db-tab-panel>
+
+          <db-tab-panel name="claims" label="Claims">
+            <db-detail-pane label="Extracted Claims">
+              <db-kpi-item label="Problem" value="Regulation burden"></db-kpi-item>
+              <db-kpi-item label="Confidence" value="0.87" variant="ok"></db-kpi-item>
+              <div slot="full">
+                <p style="margin: 0; color: var(--muted);">Full claim analysis would appear here...</p>
+              </div>
+            </db-detail-pane>
+          </db-tab-panel>
+
+          <db-tab-panel name="evidence" label="Evidence">
+            <db-detail-pane label="Evidence Sources">
+              <db-kpi-item label="Sources" value="6"></db-kpi-item>
+              <db-kpi-item label="High Credibility" value="4" variant="ok"></db-kpi-item>
+              <db-kpi-item label="Gate" value="PASS" variant="ok"></db-kpi-item>
+              <div slot="full">
+                <p style="margin: 0; color: var(--muted);">Evidence sources list...</p>
+              </div>
+            </db-detail-pane>
+          </db-tab-panel>
+
+          <db-tab-panel name="editorial" label="Editorial">
+            <db-detail-pane label="Editorial Content">
+              <db-kpi-item label="Titles" value="3 options"></db-kpi-item>
+              <db-kpi-item label="Outline" value="Ready"></db-kpi-item>
+              <div slot="full">
+                <p style="margin: 0; color: var(--muted);">Editorial suggestions...</p>
+              </div>
+            </db-detail-pane>
+          </db-tab-panel>
+        </db-tabs>
+
+        <db-card title="Tabs Events" summary="Watch console for tab change events">
+          <div slot="content">
+            <p style="margin: 0 0 10px; color: var(--muted); font-size: 14px;">
+              Open browser console to see tab change events. Click tabs above to trigger events.
+            </p>
+            <div id="tab-event-log" style="font-family: monospace; font-size: 12px; color: var(--muted);"></div>
+          </div>
+        </db-card>
+      </div>
+    </section>
+
+    <!-- Detail Panes Section -->
+    <section>
+      <h2>4. Detail Panes (Summary + Expand)</h2>
+      <div class="demo-grid">
+        <db-detail-pane label="Topic Information" expanded>
+          <db-kpi-item label="Topic" value="AI Regulation"></db-kpi-item>
+          <db-kpi-item label="Time Horizon" value="6 months"></db-kpi-item>
+          <db-kpi-item label="Claims" value="12"></db-kpi-item>
+          <div slot="full">
+            <h4 style="margin: 0 0 10px;">Full Topic Details</h4>
+            <p style="margin: 0; color: var(--muted); font-size: 14px;">
+              AI Regulation covers emerging policy frameworks including the EU AI Act,
+              US executive orders on AI safety, and China's AI governance regulations.
+              This topic has high relevance for tech companies operating globally.
+            </p>
+          </div>
+        </db-detail-pane>
+
+        <db-detail-pane label="Score Breakdown">
+          <db-kpi-item label="Final" value="0.847" variant="ok"></db-kpi-item>
+          <db-kpi-item label="Novelty" value="0.92" variant="ok"></db-kpi-item>
+          <db-kpi-item label="Recency" value="0.78"></db-kpi-item>
+          <div slot="full">
+            <div style="display: grid; gap: 8px;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="width: 100px; font-size: 12px;">Final</span>
+                <div style="flex: 1; height: 8px; background: #e8edf5; border-radius: 4px;">
+                  <div style="width: 84.7%; height: 100%; background: var(--accent); border-radius: 4px;"></div>
+                </div>
+                <span style="font-size: 12px;">0.847</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="width: 100px; font-size: 12px;">Novelty</span>
+                <div style="flex: 1; height: 8px; background: #e8edf5; border-radius: 4px;">
+                  <div style="width: 92%; height: 100%; background: var(--ok); border-radius: 4px;"></div>
+                </div>
+                <span style="font-size: 12px;">0.92</span>
+              </div>
+            </div>
+          </div>
+        </db-detail-pane>
+      </div>
+    </section>
+
+    <!-- Settings Field Cards Section -->
+    <section>
+      <h2>5. Settings Field Cards</h2>
+      <div class="demo-grid">
+        <settings-field-card
+          label="Novelty Score Weight"
+          path="scoring.novelty_score"
+          type="number"
+          value="0.3"
+          default="0.25"
+          min="0"
+          max="1"
+          step="0.05"
+          help="Controls novelty-based topic filtering">
+        </settings-field-card>
+
+        <settings-field-card
+          label="Enable Caching"
+          path="cache.enabled"
+          type="boolean"
+          value="true"
+          default="false"
+          help="Cache API responses to reduce rate limiting">
+        </settings-field-card>
+
+        <settings-field-card
+          label="RSS Feed URLs"
+          path="rss.feeds"
+          type="list"
+          value="https://reddit.com/r/technology,.hot,https://news.ycombinator.com"
+          default=""
+          help="Comma-separated list of RSS feed URLs">
+        </settings-field-card>
+
+        <settings-field-card
+          label="Stage Timeouts"
+          path="timeouts.stages"
+          type="map_integer"
+          value='{"ingest":60,"score":120}'
+          default=""
+          help="Per-stage timeout in seconds">
+        </settings-field-card>
+
+        <settings-field-card
+          label="Topic Keywords"
+          path="topics.keywords"
+          type="map_list"
+          value='{"ai":["artificial intelligence","machine learning"],"climate":["climate change","environment"]}'
+          default=""
+          help="Keywords per topic for classification">
+        </settings-field-card>
+
+        <settings-field-card
+          label="System Prompt"
+          path="prompts.system"
+          type="object"
+          multiline
+          value='{"role":"system","content":"You are a helpful assistant."}'
+          default=""
+          help="Custom system prompt for LLM">
+        </settings-field-card>
+      </div>
+    </section>
+
+    <!-- Interactive Examples -->
+    <section>
+      <h2>6. Interactive Examples</h2>
+      <div class="demo-grid">
+        <db-card id="interactive-card" title="Click Counter" summary="Clicked: 0 times">
+          <div slot="content">
+            <p style="margin: 0 0 10px; color: var(--muted); font-size: 14px;">
+              This card demonstrates programmatic updates. Click the button to increment the counter.
+            </p>
+            <button
+              id="click-counter"
+              class="db-button db-button--primary">
+              Click Me
+            </button>
+          </div>
+        </db-card>
+
+        <db-card id="dynamic-kpi" title="Dynamic KPI Updates" summary="Real-time metric simulation">
+          <div slot="content">
+            <db-kpi-strip id="live-metrics">
+              <db-kpi-item label="CPU" value="45%"></db-kpi-item>
+              <db-kpi-item label="Memory" value="62%"></db-kpi-item>
+              <db-kpi-item label="Requests" value="1,234"></db-kpi-item>
+            </db-kpi-strip>
+            <p style="margin: 10px 0 0; color: var(--muted); font-size: 12px;">
+              Values update every 2 seconds to simulate real-time data.
+            </p>
+            <button id="pause-metrics" class="db-button db-button--sm" style="margin-top: 8px;">Pause Updates</button>
+          </div>
+        </db-card>
+      </div>
+    </section>
+
+    <!-- Edge Cases -->
+    <section>
+      <h2>7. Edge Cases</h2>
+      <div class="demo-grid">
+        <db-card title="Empty Content" summary="Card with minimal content">
+          <div slot="content">
+            <p style="margin: 0; color: var(--muted); font-size: 14px; font-style: italic;">
+              (No content available)
+            </p>
+          </div>
+        </db-card>
+
+        <settings-field-card
+          label="Field with Error"
+          path="test.field"
+          type="string"
+          value="invalid value"
+          error="Value must be alphanumeric only"
+          help="This field shows error state styling">
+        </settings-field-card>
+      </div>
+    </section>
+
+    <!-- Long Content & Tables -->
+    <section>
+      <h2>8. Long Content & Tables (Scroll Testing)</h2>
+      <div class="demo-full">
+        <!-- Candidate Queue Table with Filters -->
+        <db-card title="Decision Queue" summary="Top candidates with filtering" expanded>
+          <div slot="content">
+            <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+              <input type="search" placeholder="Search candidates..." style="flex: 1; padding: 8px; border: 1px solid var(--line); border-radius: 4px; font-size: 12px;">
+              <button style="padding: 8px 12px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); cursor: pointer; font-size: 12px;">Refresh</button>
+              <select style="padding: 8px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); font-size: 12px;">
+                <option>All Topics</option>
+                <option>AI Regulation</option>
+                <option>Climate Tech</option>
+                <option>Dev Tools</option>
+              </select>
+            </div>
+            <div style="max-height: 300px; overflow: auto; border: 1px solid var(--line); border-radius: 4px;">
+              <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+                <thead style="position: sticky; top: 0; background: var(--panel);">
+                  <tr style="border-bottom: 1px solid var(--line);">
+                    <th style="padding: 8px; text-align: left;">#</th>
+                    <th style="padding: 8px; text-align: left;">Topic</th>
+                    <th style="padding: 8px; text-align: left;">Score</th>
+                    <th style="padding: 8px; text-align: left;">Novelty</th>
+                    <th style="padding: 8px; text-align: left;">Title</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr style="border-bottom: 1px solid var(--line); cursor: pointer;" onmouseover="this.style.background='#f7fbff'" onmouseout="this.style.background=''">
+                    <td style="padding: 8px;">1</td>
+                    <td style="padding: 8px;"><span style="padding: 2px 6px; border: 1px solid var(--line); border-radius: 4px; font-size: 11px;">AI</span></td>
+                    <td style="padding: 8px;">0.847</td>
+                    <td style="padding: 8px;">HIGH</td>
+                    <td style="padding: 8px;">EU AI Act Compliance Guide for Startups</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid var(--line); cursor: pointer;" onmouseover="this.style.background='#f7fbff'" onmouseout="this.style.background=''">
+                    <td style="padding: 8px;">2</td>
+                    <td style="padding: 8px;"><span style="padding: 2px 6px; border: 1px solid var(--line); border-radius: 4px; font-size: 11px;">Climate</span></td>
+                    <td style="padding: 8px;">0.792</td>
+                    <td style="padding: 8px;">MED</td>
+                    <td style="padding: 8px;">Carbon Capture Breakthrough: New Materials</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid var(--line); cursor: pointer;" onmouseover="this.style.background='#f7fbff'" onmouseout="this.style.background=''">
+                    <td style="padding: 8px;">3</td>
+                    <td style="padding: 8px;"><span style="padding: 2px 6px; border: 1px solid var(--line); border-radius: 4px; font-size: 11px;">AI</span></td>
+                    <td style="padding: 8px;">0.781</td>
+                    <td style="padding: 8px;">HIGH</td>
+                    <td style="padding: 8px;">Open Source Models vs Proprietary: Cost Analysis</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid var(--line); cursor: pointer;" onmouseover="this.style.background='#f7fbff'" onmouseout="this.style.background=''">
+                    <td style="padding: 8px;">4</td>
+                    <td style="padding: 8px;"><span style="padding: 2px 6px; border: 1px solid var(--line); border-radius: 4px; font-size: 11px;">DevTools</span></td>
+                    <td style="padding: 8px;">0.756</td>
+                    <td style="padding: 8px;">MED</td>
+                    <td style="padding: 8px;">Rust vs Zig: Systems Programming in 2025</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid var(--line); cursor: pointer;" onmouseover="this.style.background='#f7fbff'" onmouseout="this.style.background=''">
+                    <td style="padding: 8px;">5</td>
+                    <td style="padding: 8px;"><span style="padding: 2px 6px; border: 1px solid var(--line); border-radius: 4px; font-size: 11px;">Climate</span></td>
+                    <td style="padding: 8px;">0.734</td>
+                    <td style="padding: 8px;">LOW</td>
+                    <td style="padding: 8px;">EV Battery Recycling: Policy Updates</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid var(--line); cursor: pointer;" onmouseover="this.style.background='#f7fbff'" onmouseout="this.style.background=''">
+                    <td style="padding: 8px;">6</td>
+                    <td style="padding: 8px;"><span style="padding: 2px 6px; border: 1px solid var(--line); border-radius: 4px; font-size: 11px;">AI</span></td>
+                    <td style="padding: 8px;">0.721</td>
+                    <td style="padding: 8px;">MED</td>
+                    <td style="padding: 8px;">Agent-Based AI: Multi-System Coordination</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid var(--line); cursor: pointer;" onmouseover="this.style.background='#f7fbff'" onmouseout="this.style.background=''">
+                    <td style="padding: 8px;">7</td>
+                    <td style="padding: 8px;"><span style="padding: 2px 6px; border: 1px solid var(--line); border-radius: 4px; font-size: 11px;">DevTools</span></td>
+                    <td style="padding: 8px;">0.698</td>
+                    <td style="padding: 8px;">HIGH</td>
+                    <td style="padding: 8px;">Turbopack vs esbuild: Benchmarks</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid var(--line); cursor: pointer;" onmouseover="this.style.background='#f7fbff'" onmouseout="this.style.background=''">
+                    <td style="padding: 8px;">8</td>
+                    <td style="padding: 8px;"><span style="padding: 2px 6px; border: 1px solid var(--line); border-radius: 4px; font-size: 11px;">AI</span></td>
+                    <td style="padding: 8px;">0.685</td>
+                    <td style="padding: 8px;">LOW</td>
+                    <td style="padding: 8px;">Fine-Tuning vs RAG: When to Use Which</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid var(--line); cursor: pointer;" onmouseover="this.style.background='#f7fbff'" onmouseout="this.style.background=''">
+                    <td style="padding: 8px;">9</td>
+                    <td style="padding: 8px;"><span style="padding: 2px 6px; border: 1px solid var(--line); border-radius: 4px; font-size: 11px;">Climate</span></td>
+                    <td style="padding: 8px;">0.672</td>
+                    <td style="padding: 8px;">MED</td>
+                    <td style="padding: 8px;">Green Hydrogen Infrastructure Investments</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid var(--line); cursor: pointer;" onmouseover="this.style.background='#f7fbff'" onmouseout="this.style.background=''">
+                    <td style="padding: 8px;">10</td>
+                    <td style="padding: 8px;"><span style="padding: 2px 6px; border: 1px solid var(--line); border-radius: 4px; font-size: 11px;">DevTools</span></td>
+                    <td style="padding: 8px;">0.659</td>
+                    <td style="padding: 8px;">HIGH</td>
+                    <td style="padding: 8px;">TypeScript 5.8: What's New</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid var(--line); cursor: pointer;" onmouseover="this.style.background='#f7fbff'" onmouseout="this.style.background=''">
+                    <td style="padding: 8px;">11</td>
+                    <td style="padding: 8px;"><span style="padding: 2px 6px; border: 1px solid var(--line); border-radius: 4px; font-size: 11px;">AI</span></td>
+                    <td style="padding: 8px;">0.647</td>
+                    <td style="padding: 8px;">MED</td>
+                    <td style="padding: 8px;">Anthropic's Context Window Expansion</td>
+                  </tr>
+                  <tr style="cursor: pointer;" onmouseover="this.style.background='#f7fbff'" onmouseout="this.style.background=''">
+                    <td style="padding: 8px;">12</td>
+                    <td style="padding: 8px;"><span style="padding: 2px 6px; border: 1px solid var(--line); border-radius: 4px; font-size: 11px;">Climate</span></td>
+                    <td style="padding: 8px;">0.634</td>
+                    <td style="padding: 8px;">LOW</td>
+                    <td style="padding: 8px;">Urban Heat Island Mitigation Strategies</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div style="margin-top: 8px; font-size: 11px; color: var(--muted);">Showing 12 of 45 candidates</div>
+          </div>
+        </db-card>
+
+        <!-- Run Health Table -->
+        <db-card title="Run Health" summary="Recent pipeline stages">
+          <div slot="content">
+            <div style="max-height: 200px; overflow: auto; border: 1px solid var(--line); border-radius: 4px;">
+              <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+                <thead style="position: sticky; top: 0; background: var(--panel);">
+                  <tr style="border-bottom: 1px solid var(--line);">
+                    <th style="padding: 8px; text-align: left;">Run</th>
+                    <th style="padding: 8px; text-align: left;">Stage</th>
+                    <th style="padding: 8px; text-align: left;">Status</th>
+                    <th style="padding: 8px; text-align: left;">Duration</th>
+                    <th style="padding: 8px; text-align: left;">Model</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr style="border-bottom: 1px solid var(--line);">
+                    <td style="padding: 8px; font-family: monospace; font-size: 11px;">20250219</td>
+                    <td style="padding: 8px;">ingest_rss</td>
+                    <td style="padding: 8px;"><span style="color: var(--ok);">ok</span></td>
+                    <td style="padding: 8px;">2.3s</td>
+                    <td style="padding: 8px;">-</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid var(--line);">
+                    <td style="padding: 8px; font-family: monospace; font-size: 11px;">20250219</td>
+                    <td style="padding: 8px;">score_topics</td>
+                    <td style="padding: 8px;"><span style="color: var(--ok);">ok</span></td>
+                    <td style="padding: 8px;">8.7s</td>
+                    <td style="padding: 8px;">gpt-4o</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid var(--line);">
+                    <td style="padding: 8px; font-family: monospace; font-size: 11px;">20250219</td>
+                    <td style="padding: 8px;">extract_claims</td>
+                    <td style="padding: 8px;"><span style="color: var(--ok);">ok</span></td>
+                    <td style="padding: 8px;">15.2s</td>
+                    <td style="padding: 8px;">gpt-4o</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid var(--line);">
+                    <td style="padding: 8px; font-family: monospace; font-size: 11px;">20250219</td>
+                    <td style="padding: 8px;">generate_editorial</td>
+                    <td style="padding: 8px;"><span style="color: var(--ok);">ok</span></td>
+                    <td style="padding: 8px;">22.1s</td>
+                    <td style="padding: 8px;">gpt-4o</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid var(--line);">
+                    <td style="padding: 8px; font-family: monospace; font-size: 11px;">20250218</td>
+                    <td style="padding: 8px;">ingest_rss</td>
+                    <td style="padding: 8px;"><span style="color: var(--ok);">ok</span></td>
+                    <td style="padding: 8px;">2.1s</td>
+                    <td style="padding: 8px;">-</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid var(--line);">
+                    <td style="padding: 8px; font-family: monospace; font-size: 11px;">20250218</td>
+                    <td style="padding: 8px;">score_topics</td>
+                    <td style="padding: 8px;"><span style="color: var(--warn);">retry</span></td>
+                    <td style="padding: 8px;">-</td>
+                    <td style="padding: 8px;">gpt-4o</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid var(--line);">
+                    <td style="padding: 8px; font-family: monospace; font-size: 11px;">20250218</td>
+                    <td style="padding: 8px;">score_topics</td>
+                    <td style="padding: 8px;"><span style="color: var(--ok);">ok</span></td>
+                    <td style="padding: 8px;">9.1s</td>
+                    <td style="padding: 8px;">gpt-4o</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px; font-family: monospace; font-size: 11px;">20250218</td>
+                    <td style="padding: 8px;">extract_claims</td>
+                    <td style="padding: 8px;"><span style="color: var(--bad);">failed</span></td>
+                    <td style="padding: 8px;">-</td>
+                    <td style="padding: 8px;">gpt-4o</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </db-card>
+
+        <!-- Evidence Sources Table -->
+        <db-card title="Evidence Sources" summary="Fetched sources by topic">
+          <div slot="content">
+            <div style="max-height: 180px; overflow: auto; border: 1px solid var(--line); border-radius: 4px;">
+              <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+                <thead style="position: sticky; top: 0; background: var(--panel);">
+                  <tr style="border-bottom: 1px solid var(--line);">
+                    <th style="padding: 8px; text-align: left;">Topic</th>
+                    <th style="padding: 8px; text-align: left;">Domain</th>
+                    <th style="padding: 8px; text-align: left;">Credibility</th>
+                    <th style="padding: 8px; text-align: left;">Fetched</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr style="border-bottom: 1px solid var(--line);">
+                    <td style="padding: 8px;">AI Regulation</td>
+                    <td style="padding: 8px;">europa.eu</td>
+                    <td style="padding: 8px;"><span style="color: var(--ok);">high</span></td>
+                    <td style="padding: 8px;">✓</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid var(--line);">
+                    <td style="padding: 8px;">AI Regulation</td>
+                    <td style="padding: 8px;">techcrunch.com</td>
+                    <td style="padding: 8px;"><span style="color: var(--ok);">high</span></td>
+                    <td style="padding: 8px;">✓</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid var(--line);">
+                    <td style="padding: 8px;">AI Regulation</td>
+                    <td style="padding: 8px;">wired.com</td>
+                    <td style="padding: 8px;"><span style="color: var(--ok);">high</span></td>
+                    <td style="padding: 8px;">✓</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid var(--line);">
+                    <td style="padding: 8px;">AI Regulation</td>
+                    <td style="padding: 8px;">reddit.com</td>
+                    <td style="padding: 8px;"><span style="color: var(--warn);">medium</span></td>
+                    <td style="padding: 8px;">✓</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid var(--line);">
+                    <td style="padding: 8px;">Climate Tech</td>
+                    <td style="padding: 8px;">nature.com</td>
+                    <td style="padding: 8px;"><span style="color: var(--ok);">high</span></td>
+                    <td style="padding: 8px;">✓</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid var(--line);">
+                    <td style="padding: 8px;">Climate Tech</td>
+                    <td style="padding: 8px;">iea.org</td>
+                    <td style="padding: 8px;"><span style="color: var(--ok);">high</span></td>
+                    <td style="padding: 8px;">✓</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid var(--line);">
+                    <td style="padding: 8px;">Dev Tools</td>
+                    <td style="padding: 8px;">github.blog</td>
+                    <td style="padding: 8px;"><span style="color: var(--ok);">high</span></td>
+                    <td style="padding: 8px;">✓</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px;">Dev Tools</td>
+                    <td style="padding: 8px;">stackoverflow.blog</td>
+                    <td style="padding: 8px;"><span style="color: var(--ok);">high</span></td>
+                    <td style="padding: 8px;">✓</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </db-card>
+      </div>
+    </section>
+
+    <!-- Nested Cards with Long Content -->
+    <section>
+      <h2>9. Nested Detail Panes (Full Content Test)</h2>
+      <div class="demo-grid" style="grid-template-columns: 1fr 1fr;">
+        <db-tabs active-tab="narrative-full">
+          <db-tab-panel name="narrative-full" label="Full Narrative">
+            <db-detail-pane label="Complete Narrative Analysis" expanded>
+              <db-kpi-item label="Who Cares" value="Tech policy makers, startup founders"></db-kpi-item>
+              <db-kpi-item label="Problem" value="EU AI Act compliance burden"></db-kpi-item>
+              <db-kpi-item label="Solution" value="Step-by-step compliance guide"></db-kpi-item>
+              <db-kpi-item label="Confidence" value="0.89" variant="ok"></db-kpi-item>
+              <div slot="full">
+                <h4 style="margin: 0 0 12px; font-size: 14px;">Full Narrative Analysis</h4>
+                <div style="display: grid; gap: 16px;">
+                  <div>
+                    <h5 style="margin: 0 0 6px; font-size: 12px; color: var(--muted); text-transform: uppercase;">Who Cares</h5>
+                    <p style="margin: 0; font-size: 13px; line-height: 1.5;">Tech policy makers across EU member states are racing to implement the AI Act's requirements. Startup founders building AI-powered products need clarity on classification rules, risk assessment procedures, and compliance timelines. Compliance officers at established companies are seeking practical guidance for adapting existing products to new regulations.</p>
+                  </div>
+                  <div>
+                    <h5 style="margin: 0 0 6px; font-size: 12px; color: var(--muted); text-transform: uppercase;">Problem Pressure</h5>
+                    <p style="margin: 0; font-size: 13px; line-height: 1.5;">The EU AI Act introduces a risk-based classification system with strict requirements for high-risk AI systems. Companies face significant uncertainty about: (1) which category their products fall into, (2) what documentation and testing is required, (3) certification timelines and costs, and (4) penalties for non-compliance up to 6% of global revenue.</p>
+                  </div>
+                  <div>
+                    <h5 style="margin: 0 0 6px; font-size: 12px; color: var(--muted); text-transform: uppercase;">Proposed Solution</h5>
+                    <p style="margin: 0; font-size: 13px; line-height: 1.5;">A comprehensive compliance guide that breaks down the classification process into a decision tree, provides templates for required documentation (technical documentation, risk assessment, quality management), offers a step-by-step certification roadmap, and includes real-world case studies from companies that have completed the process.</p>
+                  </div>
+                  <div>
+                    <h5 style="margin: 0 0 6px; font-size: 12px; color: var(--muted); text-transform: uppercase;">Supporting Evidence</h5>
+                    <ul style="margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.6;">
+                      <li>Official EU AI Act documentation (europa.eu) - High credibility</li>
+                      <li>European Commission AI guidelines (ec.europa.eu) - High credibility</li>
+                      <li>Startup Europe policy analysis (startupeurope.org) - Medium credibility</li>
+                      <li>TechCrunch analysis of implementation challenges (techcrunch.com) - High credibility</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </db-detail-pane>
+          </db-tab-panel>
+
+          <db-tab-panel name="claims-full" label="Full Claims">
+            <db-detail-pane label="Extracted Claims with Sources">
+              <db-kpi-item label="Claims" value="8 extracted"></db-kpi-item>
+              <db-kpi-item label="Corroboration" value="0.76" variant="ok"></db-kpi-item>
+              <db-kpi-item label="Evidence Gate" value="PASS" variant="ok"></db-kpi-item>
+              <div slot="full">
+                <div style="display: grid; gap: 12px;">
+                  <div style="padding: 10px; border: 1px solid var(--line); border-radius: 4px;">
+                    <div style="font-size: 12px; font-weight: 600; margin-bottom: 4px;">Claim 1: EU AI Act penalties up to 6% of global revenue</div>
+                    <div style="font-size: 11px; color: var(--muted);">Source: europa.eu | Confidence: 0.94 | Corroborated by: 2 sources</div>
+                  </div>
+                  <div style="padding: 10px; border: 1px solid var(--line); border-radius: 4px;">
+                    <div style="font-size: 12px; font-weight: 600; margin-bottom: 4px;">Claim 2: High-risk AI systems require conformity assessment</div>
+                    <div style="font-size: 11px; color: var(--muted);">Source: ec.europa.eu | Confidence: 0.91 | Corroborated by: 3 sources</div>
+                  </div>
+                  <div style="padding: 10px; border: 1px solid var(--line); border-radius: 4px;">
+                    <div style="font-size: 12px; font-weight: 600; margin-bottom: 4px;">Claim 3: Startup founders lack clarity on classification process</div>
+                    <div style="font-size: 11px; color: var(--muted);">Source: techcrunch.com | Confidence: 0.82 | Corroborated by: 1 source</div>
+                  </div>
+                  <div style="padding: 10px; border: 1px solid var(--line); border-radius: 4px;">
+                    <div style="font-size: 12px; font-weight: 600; margin-bottom: 4px;">Claim 4: Compliance certification takes 6-18 months</div>
+                    <div style="font-size: 11px; color: var(--muted);">Source: startupeurope.org | Confidence: 0.67 | Corroborated by: 0 sources</div>
+                  </div>
+                </div>
+              </div>
+            </db-detail-pane>
+          </db-tab-panel>
+        </db-tabs>
+
+        <!-- Very long text content -->
+        <db-card title="Long Text Content" summary="Tests scrolling with paragraphs" expanded>
+          <div slot="content">
+            <div style="max-height: 350px; overflow-y: auto; padding-right: 8px;">
+              <h3 style="margin: 0 0 12px; font-size: 14px;">AI Regulation Policy Brief</h3>
+              <div style="font-size: 13px; line-height: 1.6; color: var(--text); display: grid; gap: 12px;">
+                <p>The European Union's AI Act represents the world's first comprehensive AI law, establishing a risk-based approach to regulating artificial intelligence. The legislation categorizes AI systems into four risk levels: unacceptable risk (prohibited), high risk (heavily regulated), limited risk (light transparency obligations), and minimal risk (no restrictions).</p>
+                <p>For startup founders and tech companies, the high-risk category is most critical. It includes AI systems used in critical infrastructure, medical devices, vehicle safety, employment decisions, credit scoring, law enforcement, and biometric identification. These systems must undergo conformity assessment, maintain detailed documentation, implement risk management systems, and provide transparency to users.</p>
+                <p>The compliance process involves multiple steps: first, companies must classify their AI system according to the EU's criteria. This determination can be complex, as some applications may fall into different categories depending on their specific use case. Next, high-risk systems require pre-market assessment by a notified body, similar to medical device certification in the US.</p>
+                <p>Documentation requirements are substantial. Companies must maintain technical documentation describing the AI system's design, training data, testing procedures, and performance metrics. They must also keep logs of system operations, enable human oversight where appropriate, and provide clear instructions to users. Many startups are struggling to understand exactly what level of documentation is sufficient.</p>
+                <p>The timeline for implementation extends through 2025 and beyond. Prohibited systems (like social scoring or real-time biometric surveillance in public spaces) must be removed immediately. High-risk systems have a transition period of 24-36 months depending on the specific application. However, many companies are starting compliance efforts now given the lengthy certification process.</p>
+                <p>Enforcement penalties are severe: companies can face fines up to 6% of global revenue or €30 million, whichever is higher. This creates significant liability risk for companies operating in EU markets or with EU users. Even non-EU companies must comply if their AI systems affect EU citizens.</p>
+                <p>Industry response has been mixed. Large tech companies have dedicated compliance teams and are generally prepared for the requirements. Startups, however, face disproportionate burdens relative to their resources. Some industry groups have pushed for clearer guidelines and more support for small companies. Venture capitalists are increasingly asking about AI Act compliance during due diligence.</p>
+                <p>Looking ahead, other jurisdictions are developing similar frameworks. China has implemented its own AI regulations focusing on generative AI and recommendation systems. The US is considering various approaches at the state and federal level. A global patchwork of AI regulations seems likely, increasing compliance complexity for international companies.</p>
+                <p>For practical guidance, companies should: (1) inventory their AI systems and use cases, (2) conduct preliminary risk classifications, (3) assess documentation gaps, (4) engage with legal experts specializing in EU tech regulation, (5) monitor official guidance from the European Commission and national authorities, and (6) consider joining industry associations working on implementation guidelines.</p>
+              </div>
+            </div>
+          </div>
+        </db-card>
+      </div>
+    </section>
+  </main>
+
+  <script type="module">
+    // Import all components
+    import './components/db-card.js';
+    import './components/db-kpi-strip.js';
+    import './components/db-tabs.js';
+    import './components/db-detail-pane.js';
+    import './components/settings-field-card.js';
+
+    // === Interactive Examples ===
+
+    // Click counter
+    let clickCount = 0;
+    const counterCard = document.getElementById('interactive-card');
+    const counterBtn = document.getElementById('click-counter');
+
+    counterBtn?.addEventListener('click', () => {
+      clickCount++;
+      if (counterCard && typeof counterCard.setSummary === 'function') {
+        counterCard.setSummary(`Clicked: ${clickCount} time${clickCount !== 1 ? 's' : ''}`);
+      } else {
+        console.error('counterCard or setSummary not available', counterCard);
+      }
+      console.log('Button clicked! Count:', clickCount);
+    });
+
+    // Dynamic KPI updates with pause
+    const liveMetrics = document.getElementById('live-metrics');
+    const pauseBtn = document.getElementById('pause-metrics');
+    const kpiItems = liveMetrics?.querySelectorAll('db-kpi-item') ?? [];
+    let metricsPaused = false;
+    let metricsInterval = null;
+
+    const updateMetrics = () => {
+      if (metricsPaused) return;
+      kpiItems.forEach(item => {
+        const label = item.getAttribute('label');
+        if (label === 'CPU') {
+          const value = Math.floor(Math.random() * 60) + 20;
+          item.setValue(`${value}%`);
+          item.setVariant(value > 70 ? 'warn' : value > 50 ? 'ok' : '');
+        } else if (label === 'Memory') {
+          const value = Math.floor(Math.random() * 40) + 40;
+          item.setValue(`${value}%`);
+        } else if (label === 'Requests') {
+          const value = parseInt(item.getAttribute('value')?.replace(/,/g, '') || '1234');
+          item.setValue(String(value + Math.floor(Math.random() * 100)));
+        }
+      });
+    };
+
+    metricsInterval = setInterval(updateMetrics, 2000);
+
+    pauseBtn?.addEventListener('click', () => {
+      metricsPaused = !metricsPaused;
+      pauseBtn.textContent = metricsPaused ? 'Resume Updates' : 'Pause Updates';
+      pauseBtn.classList.toggle('db-button--primary', metricsPaused);
+    });
+
+    // Tab event logging
+    const tabs = document.querySelector('db-tabs');
+    const eventLog = document.getElementById('tab-event-log');
+
+    tabs?.addEventListener('db-tabs-change', (e) => {
+      const logEntry = document.createElement('div');
+      logEntry.textContent = `[${new Date().toLocaleTimeString()}] Tab changed: ${e.detail.activeTab}`;
+      eventLog?.prepend(logEntry);
+    });
+
+    // === Global Controls ===
+
+    window.expandAll = function() {
+      document.querySelectorAll('db-card').forEach(card => {
+        if (!card.hasAttribute('non-expandable')) {
+          card.expanded = true;
+        }
+      });
+    };
+
+    window.collapseAll = function() {
+      document.querySelectorAll('db-card').forEach(card => {
+        card.expanded = false;
+      });
+    };
+
+    window.resetDemo = function() {
+      collapseAll();
+      const firstCard = document.querySelector('db-card[collapsible-group]');
+      if (firstCard) firstCard.expanded = true;
+      clickCount = 0;
+      counterCard?.setSummary('Clicked: 0 times');
+    };
+  </script>
+</body>
+</html>

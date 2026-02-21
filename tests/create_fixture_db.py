@@ -67,5 +67,6 @@ def create_fixture_db(db_path: Path):
     conn.close()
     print(f"Fixture DB created at {db_path}")
 
+
 if __name__ == "__main__":
     create_fixture_db(Path("tests/fixture.db"))

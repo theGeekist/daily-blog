@@ -1,0 +1,500 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Daily Blog Settings</title>
+    <style>
+      :root {
+        --bg: #f5f7fa;
+        --panel: #fff;
+        --line: #d7dce5;
+        --text: #1f2937;
+        --muted: #6b7280;
+        --ok: #0f8a4b;
+        --bad: #b42318;
+
+        /* Shared settings component tokens to prevent style drift */
+        --settings-surface: var(--panel);
+        --settings-line: var(--line);
+        --settings-text: var(--text);
+        --settings-muted: var(--muted);
+        --settings-error: var(--bad);
+        --settings-error-bg: #fff7f7;
+        --settings-field-bg: #fbfcfe;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: var(--bg);
+        color: var(--text);
+      }
+      header {
+        background: var(--panel);
+        border-bottom: 1px solid var(--line);
+        padding: 12px 16px;
+      }
+      .top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+      }
+      .top h1 { margin: 0; font-size: 18px; }
+      .nav {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .nav a {
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        padding: 6px 9px;
+        color: var(--text);
+        text-decoration: none;
+        background: #fff;
+        font-size: 12px;
+      }
+      .sub {
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      main {
+        display: grid;
+        gap: 10px;
+        padding: 10px;
+      }
+      .toolbar {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        padding: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      .toolbar .left {
+        display: grid;
+        gap: 3px;
+      }
+      .toolbar .left .title {
+        font-size: 13px;
+        font-weight: 700;
+      }
+      .toolbar .left .meta {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .controls {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      button {
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        background: #fff;
+        padding: 8px 10px;
+        font-size: 12px;
+        cursor: pointer;
+      }
+      .status {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .status.ok { color: var(--ok); }
+      .status.bad { color: var(--bad); }
+      .split {
+        display: grid;
+        gap: 10px;
+        grid-template-columns: 1.5fr 1fr;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        overflow: hidden;
+      }
+      .panel h2 {
+        margin: 0;
+        padding: 10px;
+        font-size: 13px;
+        border-bottom: 1px solid var(--line);
+      }
+      .panel .body {
+        padding: 10px;
+        display: grid;
+        gap: 8px;
+      }
+      .small { font-size: 12px; color: var(--muted); }
+      .pill {
+        display: inline-block;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        padding: 3px 6px;
+        font-size: 11px;
+      }
+      .ok { color: var(--ok); border-color: #b7e3cc; }
+      .warn { color: #b15f00; border-color: #f3d3ad; }
+      pre {
+        margin: 0;
+        white-space: pre-wrap;
+        font-size: 12px;
+        color: #334155;
+      }
+      .list {
+        margin: 0;
+        padding-left: 16px;
+      }
+      .list li { margin-bottom: 5px; font-size: 12px; }
+      .validation-list {
+        margin: 0;
+        padding-left: 16px;
+        display: grid;
+        gap: 4px;
+      }
+      .validation-list li {
+        font-size: 12px;
+        color: #334155;
+      }
+      .validation-list li .path {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      }
+      @media (max-width: 1150px) {
+        .split { grid-template-columns: 1fr; }
+      }
+      @media (max-width: 900px) {
+        .top {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+        .toolbar {
+          flex-direction: column;
+          align-items: stretch;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="top">
+        <h1>Settings and Configuration</h1>
+        <div class="nav">
+          <a href="/docs/viewer/dashboard.html">Dashboard</a>
+          <a href="/docs/viewer/index.html">Docs</a>
+        </div>
+      </div>
+      <div class="sub">Grouped typed fields with validation, help, and range hints. Changes apply to the next run.</div>
+    </header>
+
+    <main>
+      <section class="toolbar">
+        <div class="left">
+          <div class="title">Effective Configuration</div>
+          <div id="effective-hash" class="meta">Hash: -</div>
+        </div>
+        <div class="controls">
+          <button id="reload">Reload</button>
+          <button id="reset">Reset to Defaults</button>
+          <button id="validate">Validate</button>
+          <button id="apply">Apply for Next Run</button>
+        </div>
+      </section>
+
+      <div id="status" class="status">Loading settings form...</div>
+
+      <section id="groups" style="display:grid; gap:10px"></section>
+
+      <section class="split">
+        <div class="panel">
+          <h2>Validation Feedback</h2>
+          <div class="body">
+            <pre id="validation-output">-</pre>
+            <ul id="validation-list" class="validation-list"></ul>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Prompt Usage</h2>
+          <div class="body">
+            <div id="prompt-empty" class="small"></div>
+            <ul id="prompt-usage" class="list"></ul>
+            <div class="small">If overrides are inactive, built-in stage prompts are used.</div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="/docs/viewer/components/settings-components.js"></script>
+    <script>
+      const state = {
+        form: null,
+        values: {},
+        defaults: {},
+        promptSpecs: [],
+        fieldsByPath: {},
+        effectiveHash: "",
+        promptUsage: null,
+      };
+
+      async function getJson(path) {
+        const res = await fetch(path);
+        if (!res.ok) throw new Error(`Request failed (${res.status}) ${path}`);
+        const body = await res.json();
+        return body && typeof body === "object" && Object.prototype.hasOwnProperty.call(body, "data")
+          ? body.data
+          : body;
+      }
+
+      async function postJson(path, payload) {
+        const res = await fetch(path, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload || {}),
+        });
+        const body = await res.json();
+        const data = body && typeof body === "object" && Object.prototype.hasOwnProperty.call(body, "data")
+          ? body.data
+          : body;
+        if (!res.ok) {
+          throw new Error(JSON.stringify(data, null, 2));
+        }
+        return data;
+      }
+
+      function setStatus(text, ok) {
+        const el = document.getElementById("status");
+        el.className = `status ${ok == null ? "" : ok ? "ok" : "bad"}`;
+        el.textContent = text;
+      }
+
+      function renderValidationList(result) {
+        const list = document.getElementById("validation-list");
+        const errors = Array.isArray(result?.errors) ? result.errors : [];
+        if (!errors.length) {
+          list.innerHTML = "";
+          return;
+        }
+
+        list.innerHTML = errors
+          .map((err) => {
+            const path = String(err.path || "field");
+            const message = String(err.message || "Invalid value");
+            return `<li><span class="path">${path}</span> - ${message}</li>`;
+          })
+          .join("");
+      }
+
+      function renderPromptUsage() {
+        const usage = state.promptUsage || { stages: [], is_empty_object: true };
+        document.getElementById("prompt-empty").textContent = usage.is_empty_object
+          ? "Prompts config is currently an empty object. No overrides active."
+          : `Configured stages: ${usage.configured_stages || 0}`;
+
+        document.getElementById("prompt-usage").innerHTML = (usage.stages || [])
+          .map((s) => {
+            const cls = s.override_active ? "ok" : "warn";
+            const badge = s.override_active ? "override active" : "built-in prompt";
+            const inputs = (s.inputs || []).map(i => `<span class="pill">${i}</span>`).join(" ");
+            const outputs = (s.outputs || []).map(o => `<span class="pill ok">${o}</span>`).join(" ");
+            return `
+              <li style="margin-bottom: 15px; border-bottom: 1px solid var(--line); padding-bottom: 10px;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <strong class="mono">${s.stage}</strong>
+                  <span class="pill ${cls}">${badge}</span>
+                </div>
+                <div class="small" style="margin: 4px 0;"><strong>Purpose:</strong> ${s.purpose || "No purpose defined."}</div>
+                <div class="small" style="margin: 4px 0;"><strong>Inputs:</strong> ${inputs || "None"}</div>
+                <div class="small" style="margin: 4px 0;"><strong>Outputs:</strong> ${outputs || "None"}</div>
+                <div class="small" style="color:var(--muted)">Script: ${s.script}</div>
+              </li>`;
+          })
+          .join("");
+      }
+
+      async function renderForm() {
+        await Promise.all([
+          customElements.whenDefined("settings-group"),
+          customElements.whenDefined("settings-field"),
+          customElements.whenDefined("settings-model-card"),
+          customElements.whenDefined("settings-prompt-editor"),
+        ]);
+
+        const root = document.getElementById("groups");
+        root.innerHTML = "";
+        state.fieldsByPath = {};
+        const groups = state.form?.groups || [];
+
+        groups.forEach((group) => {
+          const groupEl = document.createElement("settings-group");
+          groupEl.setAttribute("title", group.title || group.id || "Group");
+          groupEl.setAttribute("description", group.description || "");
+          if (group.collapsible) {
+            groupEl.setAttribute("collapsible", "1");
+            if (group.collapsed) {
+              groupEl.setAttribute("collapsed", "1");
+            }
+          }
+
+          (group.model_cards || []).forEach((card) => {
+            const cardEl = document.createElement("settings-model-card");
+            cardEl.setCard(card || {});
+            groupEl.appendChild(cardEl);
+          });
+
+          (group.fields || []).forEach((field) => {
+            const value = Object.prototype.hasOwnProperty.call(state.values, field.path)
+              ? state.values[field.path]
+              : null;
+            const defaultValue = Object.prototype.hasOwnProperty.call(state.defaults, field.path)
+              ? state.defaults[field.path]
+              : null;
+
+            let fieldEl;
+            if (field.type === "prompt_override") {
+              fieldEl = document.createElement("settings-prompt-editor");
+              const spec = (state.promptSpecs || []).find((s) => s.stage_id === field.stage_id) || null;
+              fieldEl.setPrompt(field, value, spec);
+            } else {
+              fieldEl = document.createElement("settings-field");
+              fieldEl.setField(field, value, defaultValue);
+            }
+            groupEl.appendChild(fieldEl);
+            state.fieldsByPath[field.path] = fieldEl;
+          });
+
+          root.appendChild(groupEl);
+        });
+      }
+
+      function clearFieldErrors() {
+        Object.values(state.fieldsByPath).forEach((fieldEl) => fieldEl.setError(""));
+      }
+
+      function collectFieldPatch() {
+        const out = {};
+        Object.entries(state.fieldsByPath).forEach(([path, fieldEl]) => {
+          out[path] = fieldEl.getValue();
+        });
+        return out;
+      }
+
+      function resetToDefaults() {
+        Object.entries(state.fieldsByPath).forEach(([path, fieldEl]) => {
+          const defaultValue = Object.prototype.hasOwnProperty.call(state.defaults, path)
+            ? state.defaults[path]
+            : null;
+          const field = (state.form?.groups || [])
+            .flatMap((g) => g.fields || [])
+            .find((f) => f.path === path);
+          if (field?.type === "prompt_override") {
+            const spec = (state.promptSpecs || []).find((s) => s.stage_id === field.stage_id) || null;
+            fieldEl.setPrompt(field, defaultValue || { prefix: "", suffix: "", template: "" }, spec);
+          } else {
+            fieldEl.setField(field, defaultValue, defaultValue);
+          }
+        });
+      }
+
+      function applyFieldErrors(errors) {
+        clearFieldErrors();
+        (errors || []).forEach((err) => {
+          const path = String(err.path || "");
+          const message = String(err.message || "Invalid value");
+          const field = state.fieldsByPath[path];
+          if (field) field.setError(message);
+        });
+      }
+
+      async function loadAll() {
+        const [formPayload, effectivePayload] = await Promise.all([
+          getJson("/api/settings/form"),
+          getJson("/api/settings/effective"),
+        ]);
+        state.form = formPayload.form || { groups: [] };
+        state.values = formPayload.values || {};
+        state.defaults = formPayload.defaults || {};
+        state.promptSpecs = formPayload.prompt_specs || effectivePayload.prompt_specs || [];
+        state.effectiveHash = effectivePayload.effective_hash || formPayload.effective_hash || "";
+        state.promptUsage = effectivePayload.prompt_usage || null;
+
+        document.getElementById("effective-hash").textContent = `Hash: ${state.effectiveHash || "-"}`;
+        await renderForm();
+        renderPromptUsage();
+        setStatus("Settings loaded.", true);
+      }
+
+      document.getElementById("reload").addEventListener("click", async () => {
+        try {
+          await loadAll();
+          document.getElementById("validation-output").textContent = "Reloaded latest schema/values.";
+          renderValidationList({ errors: [] });
+        } catch (err) {
+          setStatus(`Reload failed: ${err.message}`, false);
+        }
+      });
+
+      document.getElementById("reset").addEventListener("click", () => {
+        resetToDefaults();
+        setStatus("Fields reset to defaults in editor. Validate/apply to persist.", true);
+      });
+
+      document.getElementById("validate").addEventListener("click", async () => {
+        try {
+          const fields = collectFieldPatch();
+          const result = await postJson("/api/settings/validate", { fields });
+          applyFieldErrors(result.errors || []);
+          document.getElementById("validation-output").textContent = JSON.stringify(result, null, 2);
+          renderValidationList(result);
+          const changed = Array.isArray(result.changed) ? result.changed : [];
+          if (changed.length) {
+            document.getElementById("validation-output").textContent += `\n\nChanged fields: ${changed.length}`;
+          }
+          setStatus("Validation passed.", true);
+        } catch (err) {
+          try {
+            const parsed = JSON.parse(String(err.message || "{}"));
+            applyFieldErrors(parsed.errors || []);
+            document.getElementById("validation-output").textContent = JSON.stringify(parsed, null, 2);
+            renderValidationList(parsed);
+          } catch {
+            document.getElementById("validation-output").textContent = String(err.message || err);
+            renderValidationList({ errors: [] });
+          }
+          setStatus("Validation failed.", false);
+        }
+      });
+
+      document.getElementById("apply").addEventListener("click", async () => {
+        try {
+          const fields = collectFieldPatch();
+          const result = await postJson("/api/settings/apply", { fields });
+          clearFieldErrors();
+          document.getElementById("validation-output").textContent = JSON.stringify(result, null, 2);
+          renderValidationList(result);
+          document.getElementById("effective-hash").textContent = `Hash: ${result.effective_hash || "-"}`;
+          setStatus("Settings applied for next run.", true);
+          await loadAll();
+        } catch (err) {
+          try {
+            const parsed = JSON.parse(String(err.message || "{}"));
+            applyFieldErrors(parsed.errors || []);
+            document.getElementById("validation-output").textContent = JSON.stringify(parsed, null, 2);
+            renderValidationList(parsed);
+          } catch {
+            document.getElementById("validation-output").textContent = String(err.message || err);
+            renderValidationList({ errors: [] });
+          }
+          setStatus("Apply failed.", false);
+        }
+      });
+
+      loadAll().catch((err) => {
+        setStatus(`Initial load failed: ${err.message}`, false);
+      });
+    </script>
+  </body>
+</html>

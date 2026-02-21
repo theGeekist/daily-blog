@@ -1,0 +1,217 @@
+/**
+ * Shared Component Styles
+ *
+ * Global stylesheet for Daily Blog components.
+ * Load this in your document head to use component styles in light DOM.
+ *
+ * These styles mirror the design tokens used in shadow DOM components.
+ */
+
+:root {
+  /* Colors - semantic */
+  --db-bg: #f5f7fa;
+  --db-panel: #ffffff;
+  --db-line: #d7dce5;
+  --db-text: #1f2937;
+  --db-muted: #6b7280;
+  --db-accent: #0e60c8;
+  --db-ok: #0f8a4b;
+  --db-warn: #b15f00;
+  --db-bad: #b42318;
+
+  /* Colors - derived */
+  --db-ok-bg: #f1fbf5;
+  --db-warn-bg: #fff6eb;
+  --db-bad-bg: #fff1f1;
+  --db-ok-border: #b7e3cc;
+  --db-warn-border: #f3d3ad;
+  --db-bad-border: #f3b7b2;
+  --db-field-bg: #fbfcfe;
+
+  /* Spacing - 4px base unit scale */
+  --db-space-1: 4px;
+  --db-space-2: 8px;
+  --db-space-3: 12px;
+  --db-space-4: 16px;
+  --db-space-5: 20px;
+  --db-space-6: 24px;
+
+  /* Typography */
+  --db-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --db-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* Font sizes */
+  --db-text-xs: 11px;
+  --db-text-sm: 12px;
+  --db-text-base: 13px;
+  --db-text-lg: 14px;
+  --db-text-xl: 18px;
+
+  /* Borders */
+  --db-radius-sm: 4px;
+  --db-radius-md: 6px;
+  --db-radius-lg: 8px;
+  --db-radius-full: 9999px;
+
+  /* Transitions */
+  --db-transition-fast: 150ms ease;
+  --db-transition-base: 200ms ease;
+  --db-transition-slow: 300ms ease;
+}
+
+/* === Buttons === */
+.db-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--db-space-2);
+  border: 1px solid var(--db-line);
+  border-radius: var(--db-radius-sm);
+  background: var(--db-panel);
+  color: var(--db-text);
+  font-size: var(--db-text-sm);
+  font-family: var(--db-font-sans);
+  padding: var(--db-space-2) var(--db-space-3);
+  cursor: pointer;
+  transition: all var(--db-transition-fast);
+  white-space: nowrap;
+}
+
+.db-button:hover:not(:disabled) {
+  border-color: #9cb3d6;
+  background: #f7fbff;
+}
+
+.db-button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.db-button:focus-visible {
+  outline: 2px solid var(--db-accent);
+  outline-offset: 2px;
+}
+
+.db-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Button variants */
+.db-button--primary {
+  background: var(--db-accent);
+  color: #fff;
+  border-color: var(--db-accent);
+}
+
+.db-button--primary:hover:not(:disabled) {
+  background: #0b52b0;
+}
+
+.db-button--ghost {
+  border-color: transparent;
+  background: transparent;
+}
+
+.db-button--ghost:hover:not(:disabled) {
+  background: #f7fbff;
+  border-color: var(--db-line);
+}
+
+.db-button--sm {
+  padding: var(--db-space-1) var(--db-space-2);
+  font-size: var(--db-text-xs);
+}
+
+.db-button--lg {
+  padding: var(--db-space-3) var(--db-space-4);
+  font-size: var(--db-text-base);
+}
+
+/* === Badges === */
+.db-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--db-space-2);
+  border: 1px solid var(--db-line);
+  border-radius: var(--db-radius-full);
+  font-size: var(--db-text-xs);
+  white-space: nowrap;
+}
+
+.db-badge--ok {
+  color: var(--db-ok);
+  border-color: var(--db-ok-border);
+  background: var(--db-ok-bg);
+}
+
+.db-badge--warn {
+  color: var(--db-warn);
+  border-color: var(--db-warn-border);
+  background: var(--db-warn-bg);
+}
+
+.db-badge--bad {
+  color: var(--db-bad);
+  border-color: var(--db-bad-border);
+  background: var(--db-bad-bg);
+}
+
+/* === Form inputs === */
+.db-input {
+  width: 100%;
+  border: 1px solid var(--db-line);
+  border-radius: var(--db-radius-sm);
+  padding: var(--db-space-2) var(--db-space-3);
+  font-size: var(--db-text-sm);
+  font-family: var(--db-font-mono);
+  color: var(--db-text);
+  background: var(--db-panel);
+  transition: border-color var(--db-transition-fast), box-shadow var(--db-transition-fast);
+}
+
+.db-input:focus {
+  outline: none;
+  border-color: var(--db-accent);
+  box-shadow: 0 0 0 2px rgba(14, 96, 200, 0.1);
+}
+
+.db-input::placeholder {
+  color: var(--db-muted);
+}
+
+.db-input:disabled {
+  background: var(--db-bg);
+  cursor: not-allowed;
+}
+
+.db-label {
+  display: block;
+  font-size: var(--db-text-sm);
+  font-weight: 600;
+  color: var(--db-text);
+  margin-bottom: var(--db-space-1);
+}
+
+.db-hint {
+  font-size: var(--db-text-xs);
+  color: var(--db-muted);
+  margin-top: var(--db-space-1);
+}
+
+.db-error {
+  font-size: var(--db-text-xs);
+  color: var(--db-bad);
+  margin-top: var(--db-space-1);
+}
+
+/* === Utility classes === */
+.db-text--muted { color: var(--db-muted); }
+.db-text--ok { color: var(--db-ok); }
+.db-text--warn { color: var(--db-warn); }
+.db-text--bad { color: var(--db-bad); }
+
+.db-font--mono { font-family: var(--db-font-mono); }
+.db-font--sans { font-family: var(--db-font-sans); }
+
+.db-bg--panel { background: var(--db-panel); }
+.db-bg--muted { background: var(--db-bg); }

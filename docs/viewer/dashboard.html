@@ -1,0 +1,1304 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Daily Blog Decision Dashboard</title>
+    <style>
+      :root {
+        --bg: #f5f7fa;
+        --panel: #ffffff;
+        --line: #d7dce5;
+        --text: #1f2937;
+        --muted: #6b7280;
+        --accent: #0e60c8;
+        --ok: #0f8a4b;
+        --warn: #b15f00;
+        --bad: #b42318;
+        --radius: 4px;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: var(--text);
+        background: var(--bg);
+        min-height: 100vh;
+        overflow-y: auto;
+        overflow-x: hidden;
+      }
+      header {
+        background: var(--panel);
+        border-bottom: 1px solid var(--line);
+        padding: 12px 16px;
+      }
+      .header-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+      }
+      .header-nav {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .header-nav a {
+        display: inline-block;
+        padding: 6px 9px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: #fff;
+        color: var(--text);
+        font-size: 12px;
+      }
+      h1 {
+        margin: 0;
+        font-size: 18px;
+      }
+      .meta { color: var(--muted); font-size: 12px; }
+      .workflow {
+        margin-top: 10px;
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 8px;
+      }
+      .workflow .step {
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 8px;
+        background: #fff;
+        font-size: 12px;
+      }
+      .workflow .step strong { display: block; margin-bottom: 4px; }
+      .layout {
+        display: grid;
+        grid-template-columns: 1.1fr 1.4fr;
+        gap: 10px;
+        padding: 10px;
+      }
+      .col { display: grid; gap: 10px; align-content: start; }
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 10px;
+      }
+      .card h2 {
+        margin: 0 0 8px;
+        font-size: 13px;
+      }
+      .snapshot-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+      }
+      .kpis {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
+      }
+      .kpi {
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 8px;
+      }
+      .kpi .k { color: var(--muted); font-size: 11px; }
+      .kpi .v { font-size: 14px; font-weight: 700; margin-top: 3px; line-height: 1.2; }
+      .toolbar { display: flex; gap: 8px; margin-bottom: 8px; }
+      .filter-state {
+        margin-bottom: 8px;
+        padding: 7px 10px;
+        border-radius: var(--radius);
+        border: 1px solid #c7d8f5;
+        background: #eef5ff;
+        font-size: 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+      }
+      .filter-state[hidden] { display: none; }
+      button[disabled] {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      input[type="search"] {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 8px;
+      }
+      button {
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: #fff;
+        padding: 8px 10px;
+        cursor: pointer;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+      }
+      th, td {
+        padding: 7px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+      }
+      th { color: var(--muted); font-weight: 600; }
+      tr.clickable { cursor: pointer; }
+      tr.clickable:hover { background: #f7fbff; }
+      tr.selected { background: #eaf4ff; }
+      .pill {
+        display: inline-block;
+        padding: 2px 7px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        font-size: 11px;
+        white-space: nowrap;
+        max-width: 200px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .topic-chip {
+        border: none;
+        background: transparent;
+        padding: 0;
+        cursor: pointer;
+      }
+      .ok { color: var(--ok); border-color: #b7e3cc; }
+      .warn { color: var(--warn); border-color: #f3d3ad; }
+      .bad { color: var(--bad); border-color: #f3b7b2; }
+      .small { color: var(--muted); font-size: 12px; }
+      .detail-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+      .meta-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 8px;
+        margin-bottom: 8px;
+      }
+      .meta-card {
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 8px;
+      }
+      .meta-card .label {
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .meta-card .value {
+        font-size: 15px;
+        font-weight: 700;
+        margin-top: 3px;
+      }
+      .meta-card .hint {
+        margin-top: 3px;
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .box {
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 8px;
+      }
+      .box h3 { margin: 0 0 6px; font-size: 12px; }
+      .box p { margin: 0; font-size: 12px; line-height: 1.45; }
+      .box ul { margin: 4px 0 0 18px; }
+      .box li { font-size: 13px; line-height: 1.35; }
+      .evidence-gate {
+        margin: 0 0 8px;
+        padding: 8px 10px;
+        border: 1px solid var(--line);
+        border-left-width: 4px;
+        border-radius: var(--radius);
+        font-size: 12px;
+        line-height: 1.4;
+      }
+      .evidence-gate strong { display: block; margin-bottom: 2px; }
+      .evidence-gate.ok { border-left-color: var(--ok); background: #f1fbf5; }
+      .evidence-gate.warn { border-left-color: var(--warn); background: #fff6eb; }
+      .evidence-gate.bad { border-left-color: var(--bad); background: #fff1f1; }
+      .score-row {
+        display: grid;
+        grid-template-columns: 110px 1fr 45px;
+        gap: 8px;
+        align-items: center;
+        margin: 4px 0;
+      }
+      .score-label {
+        font-size: 12px;
+      }
+      .mono {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      }
+      .bar {
+        background: #e8edf5;
+        height: 8px;
+        border-radius: 3px;
+        overflow: hidden;
+      }
+      .bar > span {
+        display: block;
+        height: 100%;
+        background: var(--accent);
+      }
+      .run-progress {
+        margin-top: 8px;
+        display: grid;
+        gap: 6px;
+      }
+      .run-progress .line {
+        height: 8px;
+        background: #e8edf5;
+        border-radius: 3px;
+        overflow: hidden;
+      }
+      .run-progress .line > span {
+        display: block;
+        height: 100%;
+        background: var(--accent);
+      }
+      .persona-controls {
+        display: flex;
+        gap: 6px;
+        margin-top: 6px;
+      }
+      .persona-controls input {
+        flex: 1;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 6px;
+        font-size: 12px;
+      }
+      #detail-meta {
+        margin-bottom: 8px;
+      }
+      #detail-summary {
+        margin-top: 6px;
+        line-height: 1.52;
+      }
+      #editorial-titles,
+      #editorial-checklist {
+        margin: 4px 0 0 14px;
+      }
+      #editorial-titles li,
+      #editorial-checklist li {
+        font-size: 12px;
+      }
+      a { color: var(--accent); text-decoration: none; }
+      @media (max-width: 1100px) {
+        .header-top {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="header-top">
+        <h1>Daily Blog Decision Dashboard</h1>
+        <div class="header-nav">
+          <a href="/docs/viewer/settings.html">Settings</a>
+          <a href="/docs/viewer/index.html">Docs</a>
+          <div class="meta" id="meta">Loading...</div>
+        </div>
+      </div>
+      <div class="workflow">
+        <div class="step"><strong>1) Pick candidate</strong>Choose from ranked list by score + novelty.</div>
+        <div class="step"><strong>2) Validate narrative</strong>Check problem, audience, and proposed solution.</div>
+        <div class="step"><strong>3) Verify evidence</strong>Review fetched sources and credibility mix.</div>
+        <div class="step"><strong>4) Commit action</strong>Use outline to publish or defer with reason.</div>
+      </div>
+    </header>
+
+    <db-split-layout>
+      <section class="col" slot="left">
+        <div class="card">
+          <div class="snapshot-head">
+            <h2>Run Snapshot</h2>
+            <button id="run-now">Run Pipeline</button>
+          </div>
+          <div class="run-progress" id="run-progress" hidden>
+            <div class="small" id="run-progress-label">No run in progress</div>
+            <div class="line"><span id="run-progress-bar" style="width:0%"></span></div>
+            <div class="small" id="run-progress-log"></div>
+          </div>
+          <div class="kpis" id="summary"></div>
+        </div>
+
+        <db-panel heading="Decision Queue (Top Candidates)" min-height="380">
+          <div class="toolbar">
+            <input id="search" type="search" placeholder="Search candidate/title/topic/source" />
+            <button id="refresh">Refresh</button>
+            <button id="clear-topic">Clear Topic Filter</button>
+          </div>
+          <div class="filter-state" id="active-filter" hidden>
+            <span id="active-filter-text"></span>
+            <button id="clear-topic-inline">Clear</button>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Topic</th>
+                <th>Score</th>
+                <th>Novelty</th>
+                <th>Candidate</th>
+              </tr>
+            </thead>
+            <tbody id="candidates"></tbody>
+          </table>
+          <p class="small" id="candidate-context"></p>
+        </db-panel>
+
+        <div class="card">
+          <h2>Run Health (Recent Stages)</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Run</th>
+                <th>Stage</th>
+                <th>Status</th>
+                <th>Duration</th>
+                <th>Model</th>
+              </tr>
+            </thead>
+            <tbody id="runs"></tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h2>Run Delta</h2>
+          <p class="small" id="delta-base">No baseline run available yet.</p>
+          <div class="detail-grid">
+            <div class="box">
+              <h3>Config Changes</h3>
+              <ul id="delta-config"><li>No config changes detected.</li></ul>
+            </div>
+            <div class="box">
+              <h3>Metric Deltas</h3>
+              <ul id="delta-metrics"><li>No metric deltas detected.</li></ul>
+            </div>
+          </div>
+          <p class="small">Manage settings in <a href="/docs/viewer/settings.html" target="_blank">Settings</a>.</p>
+        </div>
+      </section>
+
+      <section class="col" slot="right">
+        <db-panel heading="Candidate Narrative & Action Context" min-height="520">
+          <div id="detail-empty" class="small">Select a candidate from the left to load full context.</div>
+          <div id="detail" style="display:none">
+            <div class="box" style="margin-bottom:8px">
+              <h3 id="detail-title"></h3>
+              <p id="detail-meta" class="small"></p>
+              <p id="detail-summary"></p>
+            </div>
+
+            <div id="evidence-gate" class="evidence-gate" hidden></div>
+
+            <div class="box" style="margin-bottom:8px">
+              <h3>Context Links / Media</h3>
+              <ul id="context-links"></ul>
+            </div>
+
+            <div class="meta-grid" id="post-metadata"></div>
+
+            <div class="detail-grid" style="margin-bottom:8px">
+              <div class="box"><h3>Who Cares</h3><p id="claim-who"></p></div>
+              <div class="box"><h3>Problem Pressure</h3><p id="claim-problem"></p></div>
+              <div class="box"><h3>Proposed Solution</h3><p id="claim-solution"></p></div>
+              <div class="box"><h3>Topic Why It Matters</h3><p id="topic-why"></p></div>
+            </div>
+
+            <div class="box" style="margin-bottom:8px">
+              <h3>Persona (Curated)</h3>
+              <p id="persona-current">No persona selected.</p>
+              <div class="persona-controls">
+                <input id="persona-input" type="text" placeholder="Set or rename persona" />
+                <button id="persona-save">Save Persona</button>
+              </div>
+              <p class="small" id="persona-note">Stored locally in your browser for iterative curation.</p>
+            </div>
+
+            <div class="box" style="margin-bottom:8px">
+              <h3>Score Breakdown</h3>
+              <div id="score-breakdown"></div>
+            </div>
+
+            <div class="detail-grid">
+              <div class="box">
+                <h3>Suggested Titles</h3>
+                <ul id="editorial-titles"></ul>
+              </div>
+              <div class="box">
+                <h3>Verification Checklist</h3>
+                <ul id="editorial-checklist"></ul>
+              </div>
+            </div>
+
+            <div class="box" style="margin-top:8px">
+              <h3>Outline Preview</h3>
+              <pre id="editorial-outline" style="white-space: pre-wrap; font-size: 12px;"></pre>
+            </div>
+
+            <div class="box" style="margin-top:8px">
+              <h3>Narrative Draft Sketch</h3>
+              <pre id="editorial-narrative" style="white-space: pre-wrap; font-size: 12px;"></pre>
+            </div>
+          </div>
+        </db-panel>
+
+        <div class="card">
+          <h2>Topics</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Topic</th>
+                <th>Claims</th>
+                <th>Avg Score</th>
+                <th>Sources</th>
+              </tr>
+            </thead>
+            <tbody id="topics"></tbody>
+          </table>
+          <p class="small">Click a topic to narrow candidates and sources together.</p>
+        </div>
+
+        <div class="card">
+          <h2>Evidence Sources <span class="small" id="source-filter">(all)</span></h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Topic</th>
+                <th>Domain</th>
+                <th>Credibility</th>
+                <th>Fetched</th>
+              </tr>
+            </thead>
+            <tbody id="sources"></tbody>
+          </table>
+        </div>
+      </section>
+    </db-split-layout>
+
+    <script type="module" src="/docs/viewer/components/ui-components.js"></script>
+    <script>
+      const state = {
+        latestRunId: "",
+        topicFilterId: "",
+        topicFilterSlug: "",
+        search: "",
+        selectedEntryId: "",
+        selectedTopicLabel: "",
+        contextTopicId: "",
+        contextTopicSlug: "",
+        contextTopicLabel: "",
+        candidates: [],
+        topics: [],
+        runs: [],
+        sources: [],
+        delta: {},
+        personas: [],
+        personaAssignments: {},
+        lastUiMetricAt: 0,
+      };
+
+      const num = (v) => Number(v || 0);
+
+      async function getJson(path) {
+        const res = await fetch(path);
+        if (!res.ok) {
+          throw new Error(`Request failed (${res.status}): ${path}`);
+        }
+        const body = await res.json();
+        if (body && typeof body === "object" && Object.prototype.hasOwnProperty.call(body, "data")) {
+          return body.data;
+        }
+        return body;
+      }
+
+      function badgeClass(value) {
+        const v = String(value || "").toLowerCase();
+        if (v === "ok" || v === "high" || v === "1") return "pill ok";
+        if (v === "failed" || v === "low" || v === "0") return "pill bad";
+        return "pill warn";
+      }
+
+      function fmtMs(ms) {
+        return `${(num(ms) / 1000).toFixed(2)}s`;
+      }
+
+      function formatIso(value) {
+        if (!value) return "-";
+        const d = new Date(value);
+        if (Number.isNaN(d.getTime())) return String(value);
+        return d.toLocaleString();
+      }
+
+      function formatRunId(runId) {
+        if (!runId || !/^\d{8}T\d{6}Z$/.test(runId)) return runId || "-";
+        const iso = `${runId.slice(0, 4)}-${runId.slice(4, 6)}-${runId.slice(6, 8)}T${runId.slice(9, 11)}:${runId.slice(11, 13)}:${runId.slice(13, 15)}Z`;
+        return formatIso(iso);
+      }
+
+      function setSummary(summary) {
+        const runStatus = Number(summary.latest_run_failed_stages || 0) === 0 ? "ok" : "degraded";
+        const claimsCoverage = summary.candidates
+          ? `${Math.round((num(summary.claims) / num(summary.candidates)) * 100)}%`
+          : "0%";
+        const items = [
+          ["Run", formatRunId(summary.latest_run_id)],
+          ["Run Status", runStatus],
+          ["Started", formatIso(summary.latest_run_started_at)],
+          ["Mentions", summary.mentions],
+          ["Candidates", summary.candidates],
+          ["Claims", summary.claims],
+          ["Claim Coverage", claimsCoverage],
+          ["Topics", summary.topics],
+          ["Sources", `${summary.sources_fetched}/${summary.sources}`],
+          [
+            "Fetch Ratio",
+            summary.sources ? `${Math.round((summary.sources_fetched / summary.sources) * 100)}%` : "0%",
+          ],
+        ];
+        document.getElementById("summary").innerHTML = items
+          .map(([k, v]) => `<div class="kpi"><div class="k">${k}</div><div class="v">${v}</div></div>`)
+          .join("");
+        document.getElementById("meta").textContent =
+          `Latest run: ${formatRunId(summary.latest_run_id)} (${runStatus})`;
+      }
+
+      function filteredCandidates() {
+        const q = state.search.toLowerCase();
+        return state.candidates.filter((r) => {
+          const topicMatch = !state.topicFilterSlug || r.topic === state.topicFilterSlug;
+          if (!topicMatch) return false;
+          if (!q) return true;
+          return [r.title, r.topic, r.source].join(" ").toLowerCase().includes(q);
+        });
+      }
+
+      function topicLabelForSlug(slug) {
+        const found = state.topics.find((t) => t.topic_slug === slug);
+        if (!found) return slug || "-";
+        return found.label || found.topic_slug || "-";
+      }
+
+      function topicMetaForSlug(slug) {
+        return state.topics.find((t) => t.topic_slug === slug) || null;
+      }
+
+      function setTopicFilter(topicId, topicSlug, topicLabel) {
+        state.topicFilterId = topicId || "";
+        state.topicFilterSlug = topicSlug || "";
+        state.selectedTopicLabel = topicLabel || topicSlug || "";
+      }
+
+      function clearTopicFilter() {
+        setTopicFilter("", "", "");
+      }
+
+      function setContextTopic(topicId, topicSlug, topicLabel) {
+        state.contextTopicId = topicId || "";
+        state.contextTopicSlug = topicSlug || "";
+        state.contextTopicLabel = topicLabel || topicSlug || "";
+      }
+
+      function currentSourceScope() {
+        const topicId = state.topicFilterId || state.contextTopicId || "";
+        const topicSlug = state.topicFilterSlug || state.contextTopicSlug || "";
+        const topicLabel =
+          state.selectedTopicLabel || state.contextTopicLabel || topicSlug || "";
+        return { topicId, topicSlug, topicLabel };
+      }
+
+      async function loadSourcesForCurrentContext() {
+        const scope = currentSourceScope();
+        const params = new URLSearchParams();
+        params.set("limit", "100");
+        params.set("fetched_only", "1");
+        if (scope.topicId) {
+          params.set("topic_id", scope.topicId);
+        } else if (scope.topicSlug) {
+          params.set("topic_slug", scope.topicSlug);
+        }
+        state.sources = await getJson(`/api/sources?${params.toString()}`);
+      }
+
+      function renderFilterUi() {
+        const active = Boolean(state.topicFilterSlug);
+        const text = active
+          ? `Topic filter active: ${state.selectedTopicLabel || state.topicFilterSlug}`
+          : "";
+        const bar = document.getElementById("active-filter");
+        const clearBtn = document.getElementById("clear-topic");
+        const clearInline = document.getElementById("clear-topic-inline");
+        document.getElementById("active-filter-text").textContent = text;
+        bar.hidden = !active;
+        clearBtn.disabled = !active;
+        clearInline.disabled = !active;
+      }
+
+      function renderCandidates() {
+        const rows = filteredCandidates();
+        document.getElementById("candidate-context").textContent = state.topicFilterSlug
+          ? `Filtered by topic: ${state.selectedTopicLabel || state.topicFilterSlug}`
+          : "Showing all candidate topics.";
+        document.getElementById("candidates").innerHTML = rows
+          .map((r) => {
+            const selected = state.selectedEntryId === r.entry_id ? "selected" : "";
+            const topicMeta = topicMetaForSlug(r.topic);
+            const topicId = topicMeta ? topicMeta.topic_id : "";
+            const topicLabel = topicMeta ? topicMeta.label : topicLabelForSlug(r.topic);
+            return `
+              <tr class="clickable ${selected}" data-entry="${r.entry_id}">
+                <td>${r.rank_index}</td>
+                <td>
+                  <button class="topic-chip" data-topic-slug="${r.topic}" data-topic-id="${topicId}" data-topic-label="${topicLabel}">
+                    <span class="pill" title="${topicLabel}">${topicLabel}</span>
+                  </button>
+                </td>
+                <td>${num(r.final_score).toFixed(3)}</td>
+                <td>${r.novelty_status}</td>
+                <td>
+                  <div>${r.title || "(untitled)"}</div>
+                  <div class="small">${r.source || ""} ${r.url ? `- <a href="${r.url}" target="_blank">link</a>` : ""}</div>
+                </td>
+              </tr>`;
+          })
+          .join("");
+        renderFilterUi();
+      }
+
+      function renderRuns() {
+        document.getElementById("runs").innerHTML = state.runs
+          .map(
+            (r) => `
+              <tr>
+                <td>${r.run_id}</td>
+                <td>${r.stage_name}</td>
+                <td><span class="${badgeClass(r.status)}">${r.status}</span></td>
+                <td>${fmtMs(r.duration_ms)}</td>
+                <td class="small">${r.actual_model_used || r.model_route_used}</td>
+              </tr>`
+          )
+          .join("");
+      }
+
+      function renderDelta() {
+        const d = state.delta || {};
+        const config = d.config_diff || {};
+        const metrics = d.metrics_diff || {};
+        const changed = Number(config.changed_count || 0);
+        const changedKeys = Object.keys(config.changed || {}).slice(0, 5);
+        const metricKeys = Object.keys(metrics).slice(0, 5);
+
+        document.getElementById("delta-base").textContent =
+          d.base_run_id ? `Compared with ${d.base_run_id}` : "No baseline run available yet.";
+
+        document.getElementById("delta-config").innerHTML = changed
+          ? changedKeys.map((k) => `<li><span class="mono">${k}</span></li>`).join("")
+          : "<li>No config changes detected.</li>";
+
+        document.getElementById("delta-metrics").innerHTML = metricKeys.length
+          ? metricKeys
+              .map((k) => {
+                const item = metrics[k] || {};
+                const from = item.from == null ? "-" : item.from;
+                const to = item.to == null ? "-" : item.to;
+                const delta = item.delta == null ? "" : ` (delta ${item.delta})`;
+                return `<li><span class="mono">${k}</span>: ${from} -> ${to}${delta}</li>`;
+              })
+              .join("")
+          : "<li>No metric deltas detected.</li>";
+      }
+
+      function renderTopics() {
+        document.getElementById("topics").innerHTML = state.topics
+          .map((t) => {
+            const selected = state.topicFilterId === t.topic_id ? "selected" : "";
+            return `
+              <tr class="clickable ${selected}" data-topic-id="${t.topic_id}" data-topic-slug="${t.topic_slug}">
+                <td>
+                  <div>${t.label || t.topic_slug}</div>
+                  <div class="small">${t.time_horizon || ""}</div>
+                </td>
+                <td>${t.claim_count || 0}</td>
+                <td>${t.avg_score == null ? "-" : num(t.avg_score).toFixed(3)}</td>
+                <td>${t.fetched_sources || 0}/${t.total_sources || 0}</td>
+              </tr>`;
+          })
+          .join("");
+
+        document.querySelectorAll("tr[data-topic-id]").forEach((row) => {
+          row.addEventListener("click", async () => {
+            const topicId = row.dataset.topicId || "";
+            const topicSlug = row.dataset.topicSlug || "";
+            const labelCell = row.querySelector("td div");
+            const topicLabel = labelCell ? labelCell.textContent : topicSlug;
+            setTopicFilter(topicId, topicSlug, topicLabel || "");
+            await loadSourcesForCurrentContext();
+            renderTopics();
+            renderCandidates();
+            renderSources();
+            renderFilterUi();
+          });
+        });
+      }
+
+      function renderSources() {
+        const scope = currentSourceScope();
+        const filtered = state.sources;
+
+        document.getElementById("source-filter").textContent = scope.topicSlug
+          ? `(topic: ${scope.topicLabel}; fetched only)`
+          : "(all topics; fetched only)";
+        document.getElementById("sources").innerHTML = filtered
+          .map(
+            (s) => `
+              <tr>
+                <td>${s.topic_label || s.topic_slug || s.topic_id}</td>
+                <td><a href="${s.url}" target="_blank">${s.domain}</a></td>
+                <td><span class="${badgeClass(s.credibility_guess)}">${s.credibility_guess}</span></td>
+                <td><span class="${badgeClass(String(s.fetched_ok))}">${s.fetched_ok}</span></td>
+              </tr>`
+          )
+          .join("");
+
+        if (filtered.length === 0 && scope.topicSlug) {
+          document.getElementById("sources").innerHTML =
+            `<tr><td colspan="4" class="small">No fetched evidence sources found for ${scope.topicLabel}. Recommendation remains blocked until enrichment fetch succeeds.</td></tr>`;
+        } else if (filtered.length === 0) {
+          document.getElementById("sources").innerHTML =
+            '<tr><td colspan="4" class="small">No fetched evidence sources available yet. Run enrichment and retry.</td></tr>';
+        }
+      }
+
+      function extractContextLinks(rawSummary, canonicalUrl) {
+        const links = new Set();
+        const source = String(rawSummary || "");
+        const hrefMatches = source.match(/href="(https?:\/\/[^\"]+)"/gi) || [];
+        hrefMatches.forEach((m) => {
+          const url = m.replace(/^href="/i, "").replace(/"$/i, "");
+          if (url) links.add(url);
+        });
+        const plainMatches = source.match(/https?:\/\/[^\s<>"]+/gi) || [];
+        plainMatches.forEach((u) => links.add(u));
+        if (canonicalUrl) links.add(canonicalUrl);
+        return Array.from(links).slice(0, 6);
+      }
+
+      function computePostMetadata(c, social, detail) {
+        const published = c.published ? new Date(c.published) : null;
+        let ageHours = null;
+        if (published && !Number.isNaN(published.getTime())) {
+          ageHours = Math.max(0, (Date.now() - published.getTime()) / 3600000);
+        }
+
+        const ageStatus =
+          ageHours == null ? "unknown" : ageHours < 24 ? "fresh" : ageHours < 72 ? "recent" : "stale";
+
+        const evidence = (detail.sources || []).filter((s) => {
+          if (state.topicFilterId) return s.topic_id === state.topicFilterId;
+          if (state.topicFilterSlug) return (s.topic_slug || "") === state.topicFilterSlug;
+          return true;
+        });
+        const fetched = evidence.filter((s) => Number(s.fetched_ok) === 1);
+        const highCred = fetched.filter((s) => String(s.credibility_guess) === "high").length;
+        const evidenceScore = fetched.length ? highCred / fetched.length : 0;
+
+        const engagementKnown =
+          typeof social.score === "number" || typeof social.num_comments === "number";
+        const comments = typeof social.num_comments === "number" ? social.num_comments : null;
+        const score = typeof social.score === "number" ? social.score : null;
+        const engagementLevel =
+          !engagementKnown
+            ? "unknown"
+            : (comments || 0) >= 20 || (score || 0) >= 100
+              ? "high"
+              : (comments || 0) >= 5 || (score || 0) >= 20
+                ? "medium"
+                : "low";
+
+        const trendSignal =
+          num(c.corroboration_score) >= 0.7
+            ? "rising"
+            : num(c.novelty_score) >= 0.9
+              ? "emerging"
+              : "flat";
+
+        return {
+          ageHours,
+          ageStatus,
+          trendSignal,
+          engagementKnown,
+          comments,
+          score,
+          engagementLevel,
+          evidenceCount: evidence.length,
+          fetchedCount: fetched.length,
+          evidenceScore,
+        };
+      }
+
+      function renderPostMetadata(meta) {
+        const ageValue =
+          meta.ageHours == null ? "Unknown" : meta.ageHours < 1 ? "<1h" : `${Math.round(meta.ageHours)}h`;
+        const ageHint =
+          meta.ageStatus === "fresh"
+            ? "Published in last 24h"
+            : meta.ageStatus === "recent"
+              ? "Published in last 72h"
+              : meta.ageStatus === "stale"
+                ? "Older than 72h"
+                : "Published time unavailable";
+        const engagementValue =
+          !meta.engagementKnown
+            ? "N/A"
+            : `${meta.score ?? 0} pts / ${meta.comments ?? 0} comments`;
+        const evidenceValue = `${meta.fetchedCount}/${meta.evidenceCount} fetched`;
+        const evidenceHint =
+          meta.fetchedCount === 0
+            ? "No validated fetched sources"
+            : `High-cred ratio ${(meta.evidenceScore * 100).toFixed(0)}%`;
+
+        const cards = [
+          {
+            label: "Post Age",
+            value: ageValue,
+            hint: ageHint,
+            cls: meta.ageStatus === "stale" ? "bad" : meta.ageStatus === "unknown" ? "warn" : "ok",
+          },
+          {
+            label: "Trend Signal",
+            value: meta.trendSignal,
+            hint: "Based on novelty + corroboration",
+            cls: meta.trendSignal === "rising" ? "ok" : meta.trendSignal === "emerging" ? "warn" : "warn",
+          },
+          {
+            label: "Engagement",
+            value: engagementValue,
+            hint: !meta.engagementKnown ? "Unavailable for this source" : `Level: ${meta.engagementLevel}`,
+            cls: !meta.engagementKnown ? "warn" : meta.engagementLevel === "high" ? "ok" : "warn",
+          },
+          {
+            label: "Evidence Quality",
+            value: evidenceValue,
+            hint: evidenceHint,
+            cls: meta.fetchedCount === 0 ? "bad" : meta.evidenceScore >= 0.5 ? "ok" : "warn",
+          },
+        ];
+
+        document.getElementById("post-metadata").innerHTML = cards
+          .map(
+            (c) => `
+              <div class="meta-card">
+                <div class="label">${c.label}</div>
+                <div class="value">${c.value}</div>
+                <div class="hint"><span class="${badgeClass(c.cls === "ok" ? "ok" : c.cls === "bad" ? "failed" : "medium")}">${c.cls}</span> ${c.hint}</div>
+              </div>`
+          )
+          .join("");
+      }
+
+      function renderEvidenceGate(editorial) {
+        const gate = document.getElementById("evidence-gate");
+        const status = String(editorial.evidence_status || "WARN").toUpperCase();
+        const uiState = editorial.evidence_ui_state || status;
+        const reasons = parseJsonArray(editorial.evidence_reasons_json);
+
+        const cls = status === "PASS" ? "ok" : status === "BLOCK" ? "bad" : "warn";
+        const recommendation =
+          status === "PASS"
+            ? "Recommendation is allowed."
+            : status === "BLOCK"
+              ? "Recommendation is blocked until evidence thresholds are satisfied."
+              : "Recommendation is allowed with caution and manual review.";
+
+        gate.className = `evidence-gate ${cls}`;
+        gate.hidden = false;
+        gate.innerHTML = `
+          <strong>${uiState}</strong>
+          <div>${recommendation}</div>
+          <div class="small">${reasons.length ? reasons.join("; ") : "No explicit reasons provided."}</div>
+        `;
+      }
+
+      function scoreBar(label, value) {
+        const labels = {
+          final: "Final",
+          novelty: "Novelty",
+          recency: "Recency",
+          corroboration: "Corroboration",
+          source_diversity: "Source Diversity",
+          actionability: "Actionability",
+        };
+        const v = Math.max(0, Math.min(1, num(value)));
+        const known = Object.prototype.hasOwnProperty.call(labels, label);
+        const display = known ? labels[label] : label;
+        const cls = known ? "score-label" : "score-label mono";
+        return `
+          <div class="score-row">
+            <div class="${cls}">${display}</div>
+            <div class="bar"><span style="width:${Math.round(v * 100)}%"></span></div>
+            <div>${v.toFixed(2)}</div>
+          </div>`;
+      }
+
+      function parseJsonArray(raw) {
+        if (!raw) return [];
+        if (Array.isArray(raw)) return raw;
+        try {
+          const arr = JSON.parse(raw);
+          return Array.isArray(arr) ? arr : [];
+        } catch {
+          return [];
+        }
+      }
+
+      function loadPersonaStore() {
+        try {
+          const personas = JSON.parse(localStorage.getItem("dailyBlogPersonas") || "[]");
+          const assignments = JSON.parse(localStorage.getItem("dailyBlogPersonaAssignments") || "{}");
+          state.personas = Array.isArray(personas) ? personas : [];
+          state.personaAssignments = assignments && typeof assignments === "object" ? assignments : {};
+        } catch {
+          state.personas = [];
+          state.personaAssignments = {};
+        }
+      }
+
+      function persistPersonaStore() {
+        localStorage.setItem("dailyBlogPersonas", JSON.stringify(state.personas));
+        localStorage.setItem("dailyBlogPersonaAssignments", JSON.stringify(state.personaAssignments));
+      }
+
+      function inferPersona(whoCares) {
+        const raw = String(whoCares || "").trim();
+        if (!raw) return "Unspecified audience";
+        const lower = raw.toLowerCase();
+        const existing = state.personas.find((p) => lower.includes(String(p).toLowerCase()));
+        return existing || raw;
+      }
+
+      function renderPersona(candidateEntryId, whoCares) {
+        const assigned = state.personaAssignments[candidateEntryId] || "";
+        const inferred = inferPersona(whoCares);
+        const current = assigned || inferred;
+        document.getElementById("persona-current").textContent = current;
+        document.getElementById("persona-input").value = current;
+        const count = state.personas.length;
+        document.getElementById("persona-note").textContent =
+          `${count} curated personas. Save to assign/rename for this entry.`;
+      }
+
+      function htmlToText(raw) {
+        const tmp = document.createElement("div");
+        tmp.innerHTML = String(raw || "");
+        return (tmp.textContent || tmp.innerText || "").replace(/\s+/g, " ").trim();
+      }
+
+      function cleanCandidateSummary(raw) {
+        let text = String(raw || "");
+        text = text.replace(/<!--\s*SC_OFF\s*-->/gi, "");
+        text = text.replace(/<!--\s*SC_ON\s*-->/gi, "");
+        text = htmlToText(text);
+        text = text.replace(/\bsubmitted by\b.*$/i, "").trim();
+        if (text.length > 1200) {
+          text = `${text.slice(0, 1200)}...`;
+        }
+        return text;
+      }
+
+      async function loadCandidateDetail(entryId) {
+        if (!entryId) return;
+        const detail = await getJson(
+          `/api/candidate_detail?run_id=${encodeURIComponent(state.latestRunId)}&entry_id=${encodeURIComponent(entryId)}`
+        );
+        const c = detail.candidate;
+        if (!c) {
+          document.getElementById("evidence-gate").hidden = true;
+          document.getElementById("detail-empty").textContent = "No detail available for selected candidate.";
+          return;
+        }
+
+        const claim = (detail.claims || [])[0] || {};
+        const topic = (detail.topics || [])[0] || {};
+        const editorial = (detail.editorial || [])[0] || {};
+
+        const social = detail.social || {};
+        const socialParts = [];
+        if (typeof social.score === "number") socialParts.push(`score: ${social.score}`);
+        if (typeof social.num_comments === "number") socialParts.push(`comments: ${social.num_comments}`);
+        if (typeof social.upvote_ratio === "number" && social.upvote_ratio > 0) {
+          socialParts.push(`upvote ratio: ${(social.upvote_ratio * 100).toFixed(0)}%`);
+        }
+
+        document.getElementById("detail-empty").style.display = "none";
+        document.getElementById("detail").style.display = "block";
+        document.getElementById("detail-title").textContent = c.title || "(untitled)";
+        document.getElementById("detail-meta").innerHTML = `
+          rank #${c.rank_index} | topic: ${c.topic} | score: ${num(c.final_score).toFixed(3)} | novelty: ${c.novelty_status}
+          | posted: ${formatIso(c.published)}
+          ${socialParts.length ? `| ${socialParts.join(" | ")}` : "| social metrics unavailable from source"}
+          ${c.url ? `| <a href="${c.url}" target="_blank">source link</a>` : ""}`;
+        document.getElementById("detail-summary").textContent =
+          cleanCandidateSummary(c.summary) || "No summary available.";
+
+        renderEvidenceGate(editorial);
+
+        const contextLinks = extractContextLinks(c.summary || "", c.url || "");
+        document.getElementById("context-links").innerHTML = contextLinks.length
+          ? contextLinks.map((u) => `<li><a href="${u}" target="_blank">${u}</a></li>`).join("")
+          : "<li>No links/media detected in this post.</li>";
+
+        const metadata = computePostMetadata(c, social, detail);
+        renderPostMetadata(metadata);
+
+        document.getElementById("claim-who").textContent = claim.who_cares || "Not extracted.";
+        document.getElementById("claim-problem").textContent = claim.problem_pressure || "Not extracted.";
+        document.getElementById("claim-solution").textContent = claim.proposed_solution || "Not extracted.";
+        document.getElementById("topic-why").textContent = topic.why_it_matters || "No topic rationale.";
+        renderPersona(c.entry_id, claim.who_cares || "");
+
+        document.getElementById("score-breakdown").innerHTML = [
+          scoreBar("final", c.final_score),
+          scoreBar("novelty", c.novelty_score),
+          scoreBar("recency", c.recency_score),
+          scoreBar("corroboration", c.corroboration_score),
+          scoreBar("source_diversity", c.source_diversity_score),
+          scoreBar("actionability", c.actionability_score),
+        ].join("");
+
+        const titles = parseJsonArray(editorial.title_options_json);
+        const checklist = parseJsonArray(editorial.verification_checklist_json);
+        document.getElementById("editorial-titles").innerHTML = (titles.length ? titles : ["No generated titles"]).map((x) => `<li>${x}</li>`).join("");
+        document.getElementById("editorial-checklist").innerHTML = (checklist.length ? checklist : ["No checklist available"]).map((x) => `<li>${x}</li>`).join("");
+        document.getElementById("editorial-outline").textContent =
+          editorial.outline_markdown || "No outline available for this candidate/topic.";
+        document.getElementById("editorial-narrative").textContent =
+          editorial.narrative_draft_markdown || "No narrative draft available for this candidate/topic.";
+
+        const contextTopicId = topic.topic_id || "";
+        const contextTopicSlug = topic.parent_topic_slug || c.topic || "";
+        const contextTopicLabel = topic.parent_topic_label || topicLabelForSlug(contextTopicSlug);
+        setContextTopic(contextTopicId, contextTopicSlug, contextTopicLabel);
+
+        await loadSourcesForCurrentContext();
+        renderTopics();
+        renderSources();
+        renderCandidates();
+      }
+
+      async function refresh() {
+        const summary = await getJson("/api/summary");
+        state.latestRunId = summary.latest_run_id || "";
+        setSummary(summary);
+
+        state.candidates = await getJson(`/api/candidates?run_id=${encodeURIComponent(state.latestRunId)}&limit=50`);
+        state.topics = await getJson(`/api/topics?run_id=${encodeURIComponent(state.latestRunId)}`);
+        state.runs = await getJson("/api/runs?limit=30");
+        state.delta = await getJson(`/api/delta?run_id=${encodeURIComponent(state.latestRunId)}`);
+        await loadSourcesForCurrentContext();
+
+        renderCandidates();
+        renderTopics();
+        renderRuns();
+        renderDelta();
+        renderSources();
+        renderFilterUi();
+        await pushUiMetric("refresh");
+
+        if (!state.selectedEntryId && state.candidates.length > 0) {
+          state.selectedEntryId = state.candidates[0].entry_id;
+          renderCandidates();
+          await loadCandidateDetail(state.selectedEntryId);
+        } else if (state.candidates.length === 0) {
+          document.getElementById("evidence-gate").hidden = true;
+        }
+      }
+
+      async function postJson(path, payload) {
+        const res = await fetch(path, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload || {}),
+        });
+        if (!res.ok) {
+          throw new Error(`Request failed (${res.status}): ${path}`);
+        }
+        const body = await res.json();
+        if (body && typeof body === "object" && Object.prototype.hasOwnProperty.call(body, "data")) {
+          return body.data;
+        }
+        return body;
+      }
+
+      function collectPanelHeights() {
+        const root = document.querySelector("db-split-layout");
+        const panels = Array.from(document.querySelectorAll("db-panel"));
+        return {
+          viewport_height: window.innerHeight,
+          layout_height: root ? Math.round(root.getBoundingClientRect().height) : 0,
+          panel_heights: panels.map((p) => ({
+            heading: p.getAttribute("heading") || "",
+            height: Math.round(p.getBoundingClientRect().height),
+          })),
+        };
+      }
+
+      async function pushUiMetric(eventType) {
+        const now = Date.now();
+        if (now - state.lastUiMetricAt < 1000) return;
+        state.lastUiMetricAt = now;
+        try {
+          await postJson("/api/ui_metrics", {
+            run_id: state.latestRunId || "",
+            event_type: eventType,
+            payload: collectPanelHeights(),
+          });
+        } catch {
+          // best effort only
+        }
+      }
+
+      function updateRunProgress(status) {
+        const box = document.getElementById("run-progress");
+        const label = document.getElementById("run-progress-label");
+        const bar = document.getElementById("run-progress-bar");
+        const log = document.getElementById("run-progress-log");
+        const btn = document.getElementById("run-now");
+
+        if (!status.running && !status.last_log_line) {
+          box.hidden = true;
+          btn.disabled = false;
+          return;
+        }
+
+        box.hidden = false;
+        bar.style.width = `${status.progress || 0}%`;
+        label.textContent = status.running
+          ? `Run in progress: ${status.progress || 0}%`
+          : `Last run finished (code: ${status.return_code ?? 0})`;
+        log.textContent = status.last_log_line || "";
+        btn.disabled = Boolean(status.running);
+      }
+
+      async function pollRunStatus() {
+        try {
+          const status = await getJson("/api/run_status");
+          updateRunProgress(status);
+          if (!status.running && status.latest_run_id && status.latest_run_id !== state.latestRunId) {
+            await refresh();
+          }
+        } catch {
+          // best-effort polling
+        }
+      }
+
+      document.getElementById("refresh").addEventListener("click", () => {
+        refresh().catch((err) => {
+          document.getElementById("meta").textContent = `Error: ${err.message}`;
+        });
+      });
+      document.getElementById("clear-topic").addEventListener("click", async () => {
+        clearTopicFilter();
+        await loadSourcesForCurrentContext();
+        renderTopics();
+        renderSources();
+        renderCandidates();
+        renderFilterUi();
+      });
+      document.getElementById("clear-topic-inline").addEventListener("click", async () => {
+        clearTopicFilter();
+        await loadSourcesForCurrentContext();
+        renderTopics();
+        renderSources();
+        renderCandidates();
+        renderFilterUi();
+      });
+      document.getElementById("search").addEventListener("input", (e) => {
+        state.search = e.target.value || "";
+        renderCandidates();
+      });
+
+      document.getElementById("candidates").addEventListener("click", async (event) => {
+        const chip = event.target.closest("button.topic-chip");
+        if (chip) {
+          const topicSlug = chip.dataset.topicSlug || "";
+          const topicId = chip.dataset.topicId || "";
+          const topicLabel = chip.dataset.topicLabel || topicSlug;
+          const same = state.topicFilterSlug === topicSlug;
+          if (same) {
+            clearTopicFilter();
+          } else {
+            setTopicFilter(topicId, topicSlug, topicLabel);
+          }
+          await loadSourcesForCurrentContext();
+          renderTopics();
+          renderSources();
+          renderCandidates();
+          renderFilterUi();
+          return;
+        }
+
+        const row = event.target.closest("tr[data-entry]");
+        if (!row) return;
+        state.selectedEntryId = row.dataset.entry || "";
+        renderCandidates();
+        try {
+          await loadCandidateDetail(state.selectedEntryId);
+          await pushUiMetric("candidate_select");
+        } catch (err) {
+          document.getElementById("evidence-gate").hidden = true;
+          document.getElementById("detail-empty").style.display = "block";
+          document.getElementById("detail").style.display = "none";
+          document.getElementById("detail-empty").textContent =
+            `Could not load candidate detail. ${err.message}`;
+        }
+      });
+
+      document.getElementById("persona-save").addEventListener("click", () => {
+        if (!state.selectedEntryId) return;
+        const raw = document.getElementById("persona-input").value.trim();
+        if (!raw) return;
+        if (!state.personas.includes(raw)) {
+          state.personas.push(raw);
+        }
+        state.personaAssignments[state.selectedEntryId] = raw;
+        persistPersonaStore();
+        document.getElementById("persona-current").textContent = raw;
+        document.getElementById("persona-note").textContent =
+          `${state.personas.length} curated personas. Assigned for selected candidate.`;
+      });
+
+      document.getElementById("run-now").addEventListener("click", async () => {
+        try {
+          const status = await postJson("/api/run_start", {});
+          updateRunProgress(status);
+        } catch (err) {
+          document.getElementById("meta").textContent = `Run start error: ${err.message}`;
+        }
+      });
+
+      loadPersonaStore();
+      refresh().catch((err) => {
+        document.getElementById("meta").textContent = `Error: ${err.message}`;
+        document.getElementById("detail-empty").style.display = "block";
+        document.getElementById("detail").style.display = "none";
+        document.getElementById("detail-empty").textContent =
+          "Dashboard failed to initialize. If you recently updated code, restart insights server.";
+      });
+
+      setInterval(pollRunStatus, 2000);
+    </script>
+  </body>
+</html>

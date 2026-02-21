@@ -70,9 +70,7 @@ class TestPipelineStages(unittest.TestCase):
             "RESEARCH_PACK_PATH": str(self.root / "research_pack.json"),
             "MODEL_ROUTING_CONFIG": str(Path.cwd() / "config" / "model-routing.json"),
         }
-        proc = subprocess.run(
-            ["python3", script], env=env, capture_output=True, text=True
-        )
+        proc = subprocess.run(["python3", script], env=env, capture_output=True, text=True)
         self.assertEqual(proc.returncode, 0, msg=proc.stderr + proc.stdout)
 
     def test_extract_to_editorial_path(self) -> None:
@@ -84,12 +82,8 @@ class TestPipelineStages(unittest.TestCase):
         conn = sqlite3.connect(self.db)
         claim_count = conn.execute("SELECT COUNT(*) FROM claims").fetchone()[0]
         topic_count = conn.execute("SELECT COUNT(*) FROM topic_clusters").fetchone()[0]
-        enrich_count = conn.execute(
-            "SELECT COUNT(*) FROM enrichment_sources"
-        ).fetchone()[0]
-        editorial_count = conn.execute(
-            "SELECT COUNT(*) FROM editorial_candidates"
-        ).fetchone()[0]
+        enrich_count = conn.execute("SELECT COUNT(*) FROM enrichment_sources").fetchone()[0]
+        editorial_count = conn.execute("SELECT COUNT(*) FROM editorial_candidates").fetchone()[0]
         conn.close()
 
         self.assertGreaterEqual(claim_count, 2)

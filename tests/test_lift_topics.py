@@ -110,5 +110,6 @@ class TestLiftTopics(unittest.TestCase):
 
         self.assertEqual(topics_before, topics_after)
 
+
 if __name__ == "__main__":
     unittest.main()

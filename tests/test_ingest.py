@@ -16,7 +16,8 @@ class TestIngest(unittest.TestCase):
 
         # Create a dummy RSS feed file
         self.rss_file = self.root / "test_feed.xml"
-        self.rss_file.write_text("""<?xml version="1.0" encoding="UTF-8" ?>
+        self.rss_file.write_text(
+            """<?xml version="1.0" encoding="UTF-8" ?>
 <rss version="2.0">
 <channel>
  <title>Test Feed</title>
@@ -28,7 +29,9 @@ class TestIngest(unittest.TestCase):
   <pubDate>Wed, 18 Feb 2026 10:00:00 +0000</pubDate>
  </item>
 </channel>
-</rss>""", encoding="utf-8")
+</rss>""",
+            encoding="utf-8",
+        )
 
     def tearDown(self) -> None:
         self.tmp.cleanup()
@@ -43,15 +46,10 @@ class TestIngest(unittest.TestCase):
             "FEEDS_FILE": str(self.feeds_file),
             "SQLITE_PATH": str(self.db),
             "OUTPUT_JSONL": str(self.output_jsonl),
-            "MAX_ITEMS_PER_FEED": "10"
+            "MAX_ITEMS_PER_FEED": "10",
         }
 
-        proc = subprocess.run(
-            ["python3", "ingest_rss.py"],
-            env=env,
-            capture_output=True,
-            text=True
-        )
+        proc = subprocess.run(["python3", "ingest_rss.py"], env=env, capture_output=True, text=True)
 
         self.assertEqual(proc.returncode, 0, msg=proc.stderr + proc.stdout)
         self.assertTrue(self.db.exists())
@@ -69,14 +67,10 @@ class TestIngest(unittest.TestCase):
             "FEEDS_FILE": str(self.feeds_file),
             "SQLITE_PATH": str(self.db),
         }
-        proc = subprocess.run(
-            ["python3", "ingest_rss.py"],
-            env=env,
-            capture_output=True,
-            text=True
-        )
+        proc = subprocess.run(["python3", "ingest_rss.py"], env=env, capture_output=True, text=True)
         # Should return 2 as per script logic for no feeds
         self.assertEqual(proc.returncode, 2)
+
 
 if __name__ == "__main__":
     unittest.main()

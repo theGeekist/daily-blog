@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Daily Blog Docs Viewer</title>
+    <style>
+      :root {
+        --bg: #f6f7f9;
+        --panel: #ffffff;
+        --line: #d8dce3;
+        --text: #1f2937;
+        --muted: #6b7280;
+        --link: #0f5cc0;
+      }
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: var(--text);
+        background: var(--bg);
+      }
+      .layout {
+        display: grid;
+        grid-template-columns: 280px 1fr;
+        min-height: 100vh;
+      }
+      nav {
+        border-right: 1px solid var(--line);
+        background: var(--panel);
+        padding: 16px;
+      }
+      nav h1 {
+        margin: 0 0 12px;
+        font-size: 18px;
+      }
+      nav p {
+        margin: 0 0 16px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      nav button {
+        width: 100%;
+        text-align: left;
+        border: 1px solid var(--line);
+        background: #fff;
+        border-radius: 8px;
+        padding: 10px 12px;
+        margin-bottom: 8px;
+        cursor: pointer;
+      }
+      nav button:hover {
+        border-color: #9cb3d6;
+      }
+      main {
+        padding: 20px;
+      }
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 18px;
+      }
+      .meta {
+        margin-bottom: 12px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+      #content h1,
+      #content h2,
+      #content h3 {
+        margin: 18px 0 8px;
+      }
+      #content p,
+      #content li {
+        line-height: 1.55;
+      }
+      #content pre {
+        overflow: auto;
+        background: #0f172a;
+        color: #e5e7eb;
+        padding: 12px;
+        border-radius: 8px;
+      }
+      #content code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      }
+      .tip {
+        margin-top: 14px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+      a {
+        color: var(--link);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="layout">
+      <nav>
+        <h1>Docs Viewer</h1>
+        <p>Read operator docs quickly.</p>
+        <button data-file="../README.md">Docs Index</button>
+        <button data-file="../operator/01-quickstart.md">01 Quickstart</button>
+        <button data-file="../operator/02-pipeline-map.md">02 Pipeline Map</button>
+        <button data-file="../operator/03-outputs-and-decisions.md">03 Outputs and Decisions</button>
+        <button data-file="../operator/04-configuration-and-models.md">04 Configuration and Models</button>
+        <button data-file="../operator/05-operations.md">05 Operations</button>
+        <button onclick="window.location.href='dashboard.html'">Open Insights Dashboard</button>
+        <button data-file="../internal/output-schemas.md">Internal: Output Schemas</button>
+        <button data-file="../internal/scoring-rules.md">Internal: Scoring Rules</button>
+      </nav>
+      <main>
+        <div class="card">
+          <div class="meta">File: <code id="path">../README.md</code></div>
+          <div id="content"></div>
+          <div class="tip">This is a simple local viewer. For full markdown features, open files directly in your editor.</div>
+        </div>
+      </main>
+    </div>
+    <script>
+      function escapeHtml(input) {
+        return input
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;");
+      }
+
+      function inlineCode(text) {
+        return text.replace(/`([^`]+)`/g, "<code>$1</code>");
+      }
+
+      function renderMarkdown(md) {
+        const lines = md.split("\n");
+        const out = [];
+        let inCode = false;
+        let inList = false;
+
+        for (const raw of lines) {
+          const line = raw.trimEnd();
+
+          if (line.startsWith("```")) {
+            if (!inCode) {
+              if (inList) {
+                out.push("</ul>");
+                inList = false;
+              }
+              out.push("<pre><code>");
+              inCode = true;
+            } else {
+              out.push("</code></pre>");
+              inCode = false;
+            }
+            continue;
+          }
+
+          if (inCode) {
+            out.push(escapeHtml(raw));
+            out.push("\n");
+            continue;
+          }
+
+          if (line.startsWith("### ")) {
+            if (inList) {
+              out.push("</ul>");
+              inList = false;
+            }
+            out.push(`<h3>${inlineCode(escapeHtml(line.slice(4)))}</h3>`);
+            continue;
+          }
+
+          if (line.startsWith("## ")) {
+            if (inList) {
+              out.push("</ul>");
+              inList = false;
+            }
+            out.push(`<h2>${inlineCode(escapeHtml(line.slice(3)))}</h2>`);
+            continue;
+          }
+
+          if (line.startsWith("# ")) {
+            if (inList) {
+              out.push("</ul>");
+              inList = false;
+            }
+            out.push(`<h1>${inlineCode(escapeHtml(line.slice(2)))}</h1>`);
+            continue;
+          }
+
+          if (line.startsWith("- ")) {
+            if (!inList) {
+              out.push("<ul>");
+              inList = true;
+            }
+            out.push(`<li>${inlineCode(escapeHtml(line.slice(2)))}</li>`);
+            continue;
+          }
+
+          if (line === "") {
+            if (inList) {
+              out.push("</ul>");
+              inList = false;
+            }
+            continue;
+          }
+
+          if (inList) {
+            out.push("</ul>");
+            inList = false;
+          }
+          out.push(`<p>${inlineCode(escapeHtml(line))}</p>`);
+        }
+
+        if (inList) out.push("</ul>");
+        if (inCode) out.push("</code></pre>");
+        return out.join("");
+      }
+
+      async function loadDoc(path) {
+        document.getElementById("path").textContent = path;
+        const res = await fetch(path);
+        const text = await res.text();
+        document.getElementById("content").innerHTML = renderMarkdown(text);
+      }
+
+      document.querySelectorAll("button[data-file]").forEach((btn) => {
+        btn.addEventListener("click", () => loadDoc(btn.dataset.file));
+      });
+
+      loadDoc("../README.md");
+    </script>
+  </body>
+</html>
