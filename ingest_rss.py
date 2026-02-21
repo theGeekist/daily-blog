@@ -8,8 +8,10 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
+
+from daily_blog.core.env import load_env_file
+from daily_blog.core.time_utils import utc_now_iso
 
 DEFAULT_FEEDS_FILE = "feeds.txt"
 DEFAULT_SQLITE_PATH = "./data/daily-blog.db"
@@ -28,25 +30,6 @@ class Mention:
     published: str
     summary: str
     fetched_at: str
-
-
-def utc_now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
-
-
-def load_env_file(path: Path) -> None:
-    if not path.exists():
-        return
-
-    for raw_line in path.read_text(encoding="utf-8").splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        key = key.strip()
-        value = value.strip().strip('"').strip("'")
-        if key and key not in os.environ:
-            os.environ[key] = value
 
 
 def read_feeds(path: Path) -> list[str]:
@@ -153,9 +136,7 @@ def parse_atom_entries(
     return out
 
 
-def parse_feed(
-    xml_bytes: bytes, feed_url: str, max_items: int, fetched_at: str
-) -> list[Mention]:
+def parse_feed(xml_bytes: bytes, feed_url: str, max_items: int, fetched_at: str) -> list[Mention]:
     root = ET.fromstring(xml_bytes)
 
     if root.tag == "rss" or root.find("channel") is not None:

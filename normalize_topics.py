@@ -5,10 +5,11 @@ import os
 import re
 import sqlite3
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from daily_blog.core.env import load_env_file
+from daily_blog.core.time_utils import now_iso
 from orchestrator_utils import ModelCallError, call_model
 
 DEFAULT_SQLITE_PATH = "./data/daily-blog.db"
@@ -16,24 +17,6 @@ TOPIC_CURATOR_STAGE = "topic_curator"
 DEFAULT_BATCH_SIZE = 8
 
 logger = logging.getLogger(__name__)
-
-
-def load_env_file(path: Path) -> None:
-    if not path.exists():
-        return
-    for raw_line in path.read_text(encoding="utf-8").splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        key = key.strip()
-        value = value.strip().strip('"').strip("'")
-        if key and key not in os.environ:
-            os.environ[key] = value
-
-
-def now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
 
 
 def slugify(value: str) -> str:
@@ -76,7 +59,8 @@ def init_topic_curation_columns(conn: sqlite3.Connection) -> None:
         )
     if "curator_model_route_used" not in columns:
         conn.execute(
-            "ALTER TABLE topic_clusters ADD COLUMN curator_model_route_used TEXT NOT NULL DEFAULT ''"
+            "ALTER TABLE topic_clusters ADD COLUMN "
+            "curator_model_route_used TEXT NOT NULL DEFAULT ''"
         )
     conn.commit()
 
@@ -118,7 +102,8 @@ def build_prompt(rows: list[dict[str, Any]]) -> str:
             "- Preserve the same number of topics and keep the original topic_id unchanged.",
             "- Produce clean, human-readable display labels for dashboard use.",
             "- Keep normalized_topic_slug short and stable (lowercase kebab-case).",
-            "- Avoid noisy variants (for example: Ai -> ai, web -> web, long misc labels -> general-engineering).",
+            "- Avoid noisy variants (for example: Ai -> ai, web -> web, "
+            "long misc labels -> general-engineering).",
             "- Return only valid JSON matching schema.",
             "",
             "Input topics:",
@@ -244,7 +229,8 @@ def main() -> int:
             curated, route_used = model_curate(batch)
         except ModelCallError as exc:
             logger.warning(
-                "Topic curator model call failed for batch size=%d; using fallback normalization: %s",
+                "Topic curator model call failed for batch size=%d; "
+                "using fallback normalization: %s",
                 len(batch),
                 exc,
             )

@@ -9,6 +9,8 @@ from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path
 
+from daily_blog.core.env import load_env_file
+
 DEFAULT_SQLITE_PATH = "./data/daily-blog.db"
 DEFAULT_CONFIG_PATH = "./config/rules-engine.json"
 DEFAULT_BOARD_PATH = "./data/daily_board.md"
@@ -24,21 +26,6 @@ class Mention:
     published: str
     summary: str
     fetched_at: str
-
-
-def load_env_file(path: Path) -> None:
-    if not path.exists():
-        return
-
-    for raw_line in path.read_text(encoding="utf-8").splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        key = key.strip()
-        value = value.strip().strip('"').strip("'")
-        if key and key not in os.environ:
-            os.environ[key] = value
 
 
 def parse_dt(value: str) -> datetime:

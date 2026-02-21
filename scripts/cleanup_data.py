@@ -24,6 +24,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from daily_blog.core.env import load_env_file
+
 DEFAULT_SQLITE_PATH = "./data/daily-blog.db"
 DEFAULT_DATA_DIR = "./data"
 DEFAULT_ARCHIVE_DIR = "./data/archive"
@@ -47,20 +49,6 @@ ARCHIVE_EXCLUDE_PATTERNS = [
 
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
-
-
-def load_env_file(path: Path) -> None:
-    if not path.exists():
-        return
-    for raw_line in path.read_text(encoding="utf-8").splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        key = key.strip()
-        value = value.strip().strip('"').strip("'")
-        if key and key not in os.environ:
-            os.environ[key] = value
 
 
 def should_archive_file(file_path: Path) -> bool:

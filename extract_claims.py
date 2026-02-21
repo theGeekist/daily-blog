@@ -7,10 +7,11 @@ import os
 import re
 import sqlite3
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from daily_blog.core.env import load_env_file
+from daily_blog.core.time_utils import now_iso
 from orchestrator_utils import ModelCallError, call_model
 
 DEFAULT_SQLITE_PATH = "./data/daily-blog.db"
@@ -37,24 +38,6 @@ CLAIM_EXTRACTION_SCHEMA: dict[str, Any] = {
         "sources": {"type": "array", "items": {"type": "string"}},
     },
 }
-
-
-def load_env_file(path: Path) -> None:
-    if not path.exists():
-        return
-    for raw_line in path.read_text(encoding="utf-8").splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        key = key.strip()
-        value = value.strip().strip('"').strip("'")
-        if key and key not in os.environ:
-            os.environ[key] = value
-
-
-def now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
 
 
 def strip_html(text: str) -> str:
