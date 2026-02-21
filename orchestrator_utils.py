@@ -21,6 +21,10 @@ class ModelCallError(RuntimeError):
     pass
 
 
+class ModelOutputValidationError(ModelCallError):
+    pass
+
+
 def call_model(stage_name: str, prompt: str, schema: dict | None = None) -> dict[str, Any]:
     routing = _load_model_routing(DEFAULT_MODEL_ROUTING_PATH)
     prompt = _apply_prompt_overrides(stage_name=stage_name, prompt=prompt)
@@ -64,15 +68,19 @@ def _invoke_with_retries(
     schema: dict | None,
     retries: int,
 ) -> Any:
-    last_error: Exception | None = None
+    last_error: ModelOutputValidationError | None = None
     for attempt in range(retries + 1):
         try:
             raw_output = _dispatch_model(model_name=model_name, prompt=prompt, schema=schema)
+        except ModelCallError:
+            # Hard provider/transport failures should not be retried.
+            raise
+        try:
             parsed_content = _extract_json_payload(raw_output)
             if schema is not None:
                 _validate_schema(parsed_content, schema)
             return parsed_content
-        except Exception as exc:  # noqa: BLE001
+        except ModelOutputValidationError as exc:
             last_error = exc
             if attempt >= retries:
                 break
@@ -185,7 +193,10 @@ def _dispatch_gemini(model_name: str, prompt: str, schema: dict | None) -> str:
 
 
 def _dispatch_opencode(model_name: str, prompt: str, schema: dict | None) -> str:
-    del schema
+    if schema is not None:
+        logger.warning(
+            "Schema not enforced for opencode provider; relying on prompt and post-parse validation"
+        )
     provider, model_id = _parse_model_ref(model_name)
     if provider != "opencode":
         raise ModelCallError(f"Invalid opencode model route '{model_name}'")
@@ -193,7 +204,10 @@ def _dispatch_opencode(model_name: str, prompt: str, schema: dict | None) -> str
 
 
 def _dispatch_openclaw(model_name: str, prompt: str, schema: dict | None) -> str:
-    del schema
+    if schema is not None:
+        logger.warning(
+            "Schema not enforced for openclaw provider; relying on prompt and post-parse validation"
+        )
     provider, model_id = _parse_model_ref(model_name)
     if provider != "openclaw":
         raise ModelCallError(f"Invalid openclaw model route '{model_name}'")
@@ -292,7 +306,7 @@ def _extract_json_payload(text: str) -> Any:
         except JSONDecodeError:
             continue
 
-    raise ModelCallError("No valid JSON object/array found in model output")
+    raise ModelOutputValidationError("No valid JSON object/array found in model output")
 
 
 def _validate_schema(instance: Any, schema: dict[str, Any]) -> None:
@@ -309,7 +323,9 @@ def _validate_node(instance: Any, schema: dict[str, Any], path: str) -> None:
         if isinstance(required, list):
             for key in required:
                 if key not in instance:
-                    raise ModelCallError(f"Schema validation failed at {path}: missing '{key}'")
+                    raise ModelOutputValidationError(
+                        f"Schema validation failed at {path}: missing '{key}'"
+                    )
 
         properties = schema.get("properties", {})
         if isinstance(properties, dict):
@@ -325,7 +341,7 @@ def _validate_node(instance: Any, schema: dict[str, Any], path: str) -> None:
 
     enum_values = schema.get("enum")
     if isinstance(enum_values, list) and instance not in enum_values:
-        raise ModelCallError(
+        raise ModelOutputValidationError(
             f"Schema validation failed at {path}: value {instance!r} not in enum {enum_values!r}"
         )
 
@@ -343,9 +359,9 @@ def _assert_type(instance: Any, expected: str, path: str) -> None:
 
     check = type_checks.get(expected)
     if check is None:
-        raise ModelCallError(f"Unsupported schema type '{expected}' at {path}")
+        raise ModelOutputValidationError(f"Unsupported schema type '{expected}' at {path}")
     if not check(instance):
-        raise ModelCallError(
+        raise ModelOutputValidationError(
             "Schema validation failed at "
             f"{path}: expected {expected}, got {type(instance).__name__}"
         )

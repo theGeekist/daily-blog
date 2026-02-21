@@ -107,6 +107,9 @@ class TestEnrichTopics(unittest.TestCase):
         env = {
             **os.environ,
             "SQLITE_PATH": str(self.db),
+            "ENRICH_SKIP_MODEL": "1",
+            "ENRICH_SEARCH_BACKEND": "searxng",
+            "SEARXNG_BASE_URL": "http://127.0.0.1:1",
         }
         proc = subprocess.run(
             ["python3", "enrich_topics.py"],

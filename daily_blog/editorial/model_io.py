@@ -87,6 +87,23 @@ def build_editorial_prompt(
     if not claim_lines:
         claim_lines = ["- no mapped claims available"]
     evidence_brief = evidence_brief or {}
+    strategy = str(evidence_brief.get("outline_strategy", "explainer")).strip().lower()
+    strategy_requirements = {
+        "analysis": (
+            "- Include a 'Competing Views' section that references contradicting evidence and "
+            "resolves the disagreement."
+        ),
+        "implementation-guide": (
+            "- Include a 'Step-by-Step' section with concrete actions anchored to top claims."
+        ),
+        "caution": (
+            "- Lead with caveats, uncertainty, and evidence gaps before prescribing actions."
+        ),
+        "explainer": (
+            "- Emphasize conceptual clarity, plain-language framing, and balanced context."
+        ),
+    }
+    strategy_requirement = strategy_requirements.get(strategy, strategy_requirements["explainer"])
 
     return "\n".join(
         [
@@ -134,6 +151,8 @@ def build_editorial_prompt(
                 "- verification_checklist should focus on factual correctness and "
                 "source-backed claims."
             ),
+            "- Adapt the outline structure to the evidence brief's strategy and pattern.",
+            strategy_requirement,
         ]
     )
 

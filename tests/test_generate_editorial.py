@@ -5,6 +5,7 @@ import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 class TestGenerateEditorial(unittest.TestCase):
@@ -149,6 +150,163 @@ class TestGenerateEditorial(unittest.TestCase):
         self.assertTrue(angle.strip())
         self.assertTrue(audience.strip())
         self.assertTrue(model_route_used.strip())
+
+    def test_generate_editorial_model_path_and_persisted_evidence_brief(self) -> None:
+        import generate_editorial
+
+        conn = sqlite3.connect(self.db)
+        conn.execute(
+            """
+            CREATE TABLE claims (
+                claim_id TEXT PRIMARY KEY,
+                entry_id TEXT NOT NULL,
+                headline TEXT NOT NULL,
+                who_cares TEXT NOT NULL,
+                problem_pressure TEXT NOT NULL,
+                proposed_solution TEXT NOT NULL,
+                evidence_type TEXT NOT NULL,
+                sources_json TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE claim_topic_map (
+                claim_id TEXT NOT NULL,
+                topic_id TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                PRIMARY KEY (claim_id, topic_id)
+            )
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO claims (
+                claim_id, entry_id, headline, who_cares, problem_pressure,
+                proposed_solution, evidence_type, sources_json, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "c1",
+                "e1",
+                "LLM model release notes",
+                "ml practitioners",
+                "New model released",
+                "Adopt a staged rollout",
+                "data",
+                "[]",
+                "2026-02-17T07:05:00+00:00",
+            ),
+        )
+        conn.execute(
+            """
+            INSERT INTO claim_topic_map (claim_id, topic_id, created_at)
+            VALUES (?, ?, ?)
+            """,
+            ("c1", "ai", "2026-02-17T08:05:00+00:00"),
+        )
+        conn.execute(
+            "DELETE FROM enrichment_sources WHERE topic_id = ?",
+            ("ai",),
+        )
+        for idx, domain in enumerate(("nasa.gov", "nih.gov", "nist.gov"), start=1):
+            conn.execute(
+                """
+                INSERT INTO enrichment_sources (
+                    topic_id, query_terms_json, domain, url, stance,
+                    credibility_guess, fetched_ok, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    "ai",
+                    '["llm"]',
+                    domain,
+                    f"https://{domain}/report-{idx}",
+                    "supports",
+                    "high",
+                    1,
+                    "2026-02-17T08:05:00+00:00",
+                ),
+            )
+        conn.commit()
+        conn.close()
+
+        def fake_call_model(stage_name: str, prompt: str, schema: dict | None = None) -> dict:
+            del prompt, schema
+            if stage_name == "evidence_synthesis":
+                return {
+                    "model_used": "gemini:gemini-2.0-flash",
+                    "content": {
+                        "topic_id": "ai",
+                        "claim_count": 1,
+                        "top_claims": ["LLM model release notes"],
+                        "problem_pressures": ["New model released"],
+                        "proposed_solutions": ["Adopt a staged rollout"],
+                        "evidence_type_counts": {"data": 1},
+                        "stance_breakdown": {"supports": 3},
+                        "dominant_pattern": "data-backed",
+                        "outline_strategy": "implementation-guide",
+                    },
+                }
+            return {
+                "model_used": "gemini:gemini-2.0-flash",
+                "content": {
+                    "title_options": [
+                        "AI rollout playbook",
+                        "Staged adoption guide",
+                        "AI risk controls",
+                    ],
+                    "outline_markdown": (
+                        "## What Changed\n- New capabilities\n\n"
+                        "## Step-by-Step\n1. Baseline\n2. Rollout\n\n"
+                        "## Conclusion\n- Next action"
+                    ),
+                    "narrative_draft_markdown": (
+                        "## Intro hook\n- Why now\n\n## Storyline\n- Setup\n\n"
+                        "## Sections\n1. Action\n\n## Outro\n- Verify"
+                    ),
+                    "talking_points": ["Rollout gates", "Risk controls"],
+                    "verification_checklist": [
+                        "Validate source recency",
+                        "Confirm domain diversity",
+                    ],
+                    "angle": "Execution-focused analysis.",
+                    "audience": "Operators",
+                },
+            }
+
+        env = {
+            **os.environ,
+            "SQLITE_PATH": str(self.db),
+            "TOP_OUTLINES_PATH": str(self.outlines),
+            "RESEARCH_PACK_PATH": str(self.research),
+            "MODEL_ROUTING_CONFIG": str(self.routing),
+            "EDITORIAL_STATIC_ONLY": "0",
+        }
+
+        with patch.dict(os.environ, env, clear=False), patch(
+            "generate_editorial.call_model",
+            side_effect=fake_call_model,
+        ):
+            rc = generate_editorial.main()
+        self.assertEqual(rc, 0)
+
+        conn = sqlite3.connect(self.db)
+        row = conn.execute(
+            """
+            SELECT model_route_used, evidence_brief_json
+            FROM editorial_candidates
+            WHERE topic_id = ?
+            """,
+            ("ai",),
+        ).fetchone()
+        conn.close()
+        self.assertIsNotNone(row)
+        model_route_used, evidence_brief_json = row
+        self.assertEqual(model_route_used, "gemini:gemini-2.0-flash")
+        brief = json.loads(evidence_brief_json)
+        self.assertEqual(brief["outline_strategy"], "implementation-guide")
 
 
 if __name__ == "__main__":

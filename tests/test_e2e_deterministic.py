@@ -27,6 +27,10 @@ class TestE2EDeterministic(unittest.TestCase):
             "TOP_OUTLINES_PATH": str(self.root / "top_outlines.md"),
             "RESEARCH_PACK_PATH": str(self.root / "research_pack.json"),
             "PATH": "/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+            "ENRICH_SKIP_MODEL": "1",
+            "ENRICH_SEARCH_BACKEND": "searxng",
+            "SEARXNG_BASE_URL": "http://127.0.0.1:1",
+            "EDITORIAL_STATIC_ONLY": "1",
         }
         proc = subprocess.run(
             ["python3", script_name],

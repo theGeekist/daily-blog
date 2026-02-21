@@ -1,10 +1,13 @@
 import json
+import logging
 import os
 import time
 import urllib.parse
 import urllib.request
 
 from daily_blog.enrichment.helpers import domain_for_url, normalize_url
+
+logger = logging.getLogger(__name__)
 
 
 def verify_source_fetch(url: str, timeout_seconds: int = 8) -> bool:
@@ -87,6 +90,7 @@ def _discover_ddgs(query: str, limit: int) -> list[str]:
     try:
         from duckduckgo_search import DDGS
     except ImportError:
+        logger.warning("duckduckgo-search not installed; enrichment search skipped")
         return []
 
     extracted_urls: list[str] = []
@@ -104,6 +108,7 @@ def _discover_ddgs(query: str, limit: int) -> list[str]:
                     continue
                 extracted_urls.append(candidate)
     except Exception:
+        logger.warning("DDGS search failed for query=%r", query, exc_info=True)
         return []
 
     return _dedupe_urls(extracted_urls, limit=limit)

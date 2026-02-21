@@ -69,6 +69,10 @@ class TestPipelineStages(unittest.TestCase):
             "TOP_OUTLINES_PATH": str(self.root / "top_outlines.md"),
             "RESEARCH_PACK_PATH": str(self.root / "research_pack.json"),
             "MODEL_ROUTING_CONFIG": str(Path.cwd() / "config" / "model-routing.json"),
+            "ENRICH_SKIP_MODEL": "1",
+            "ENRICH_SEARCH_BACKEND": "searxng",
+            "SEARXNG_BASE_URL": "http://127.0.0.1:1",
+            "EDITORIAL_STATIC_ONLY": "1",
         }
         proc = subprocess.run(["python3", script], env=env, capture_output=True, text=True)
         self.assertEqual(proc.returncode, 0, msg=proc.stderr + proc.stdout)

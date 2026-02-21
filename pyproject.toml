@@ -11,9 +11,12 @@ requires-python = ">=3.11"
 dependencies = [
     "duckduckgo-search>=6.0.0",
     "google-generativeai>=0.8.0",
-    "instructor>=1.7.0",
     "ollama>=0.4.0",
+    "pydantic>=2.0.0",
 ]
+
+[tool.setuptools.packages.find]
+include = ["daily_blog*"]
 
 [tool.ruff]
 line-length = 100

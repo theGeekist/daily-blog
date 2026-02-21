@@ -1,4 +1,7 @@
-def outline_for_topic(label: str, why: str) -> str:
+from collections.abc import Callable
+
+
+def _outline_explainer(label: str, why: str) -> str:
     return "\n".join(
         [
             f"# {label}: practical breakdown",
@@ -20,6 +23,86 @@ def outline_for_topic(label: str, why: str) -> str:
             "",
             "## Conclusion",
             "Summarize decision criteria and next action for readers.",
+        ]
+    )
+
+
+def _outline_analysis(label: str, why: str) -> str:
+    return "\n".join(
+        [
+            f"# {label}: contested evidence analysis",
+            "",
+            "## Context",
+            f"Why now: {why}",
+            "",
+            "## Core Claim",
+            "Define the central claim and what outcome hinges on it.",
+            "",
+            "## Competing Evidence",
+            "1. Evidence supporting the prevailing interpretation",
+            "2. Evidence contradicting the prevailing interpretation",
+            "3. Credibility and recency trade-offs",
+            "",
+            "## Decision Framework",
+            "- Which signal should be weighted most heavily?",
+            "- What condition would reverse this recommendation?",
+            "",
+            "## Conclusion",
+            "Recommend an action with explicit confidence level and re-check trigger.",
+        ]
+    )
+
+
+def _outline_implementation_guide(label: str, why: str) -> str:
+    return "\n".join(
+        [
+            f"# {label}: implementation guide",
+            "",
+            "## What Changed",
+            f"Why now: {why}",
+            "",
+            "## Evidence Anchors",
+            "- Top claims that justify immediate action",
+            "- Constraints and dependencies from current evidence",
+            "",
+            "## Step-by-Step",
+            "1. Baseline the current state and risks",
+            "2. Execute the highest-leverage change",
+            "3. Validate outcomes against objective checkpoints",
+            "",
+            "## Action Checklist",
+            "- Owner, deadline, and expected outcome per step",
+            "- Verification points tied to sources",
+            "",
+            "## Conclusion",
+            "State the immediate next action and confidence in expected impact.",
+        ]
+    )
+
+
+def _outline_caution(label: str, why: str) -> str:
+    return "\n".join(
+        [
+            f"# {label}: cautious readout",
+            "",
+            "## What We Don't Know Yet",
+            f"Why now: {why}",
+            "",
+            "## Evidence Gaps",
+            "1. Missing data that blocks strong conclusions",
+            "2. Potential biases in current sources",
+            "3. What additional validation is required",
+            "",
+            "## Low-Regret Moves",
+            "- Actions safe to take while uncertainty remains",
+            "- Monitoring signals that should trigger escalation",
+            "",
+            "## Decision Guardrails",
+            "- Conditions under which publishing should be paused",
+            "- Minimum evidence thresholds for confidence",
+            "",
+            "## Conclusion",
+            "Summarize prudent next steps and explicit uncertainty boundaries.",
         ]
     )
 
@@ -48,14 +131,23 @@ def narrative_draft_for_topic(label: str, why: str) -> str:
     )
 
 
-def static_editorial_package(label: str, why: str) -> dict:
+STRATEGY_TEMPLATES: dict[str, Callable[[str, str], str]] = {
+    "implementation-guide": _outline_implementation_guide,
+    "analysis": _outline_analysis,
+    "explainer": _outline_explainer,
+    "caution": _outline_caution,
+}
+
+
+def static_editorial_package(label: str, why: str, strategy: str = "explainer") -> dict:
+    outline_fn = STRATEGY_TEMPLATES.get(strategy, _outline_explainer)
     return {
         "title_options": [
             f"{label}: what changed, what to do next",
             f"A practical guide to {label.lower()}",
             f"{label}: decision framework for teams",
         ],
-        "outline_markdown": outline_for_topic(label, why),
+        "outline_markdown": outline_fn(label, why),
         "narrative_draft_markdown": narrative_draft_for_topic(label, why),
         "talking_points": [
             "Signal extraction from noisy inputs",

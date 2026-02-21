@@ -101,7 +101,7 @@ def main() -> int:
         ]
         sources = conn.execute(
             """
-            SELECT domain, url, fetched_ok, credibility_guess
+            SELECT domain, url, fetched_ok, credibility_guess, stance
             FROM enrichment_sources
             WHERE topic_id = ?
             ORDER BY credibility_guess DESC
@@ -117,8 +117,8 @@ def main() -> int:
         evidence_ui_state = str(assessment["ui_state"])
         evidence_reasons = [str(r) for r in assessment.get("reasons", [])]
         valid_sources = [
-            {"domain": d, "url": u, "credibility_guess": c}
-            for d, u, fetched_ok, c in sources
+            {"domain": d, "url": u, "credibility_guess": c, "stance": s}
+            for d, u, fetched_ok, c, s in sources
             if int(fetched_ok) == 1
         ]
         evidence_brief, evidence_synthesis_route = synthesize_evidence_brief(
@@ -129,11 +129,12 @@ def main() -> int:
         )
 
         static_only = os.getenv("EDITORIAL_STATIC_ONLY", "0") == "1"
+        outline_strategy = str(evidence_brief.get("outline_strategy", "explainer"))
         if bool(assessment.get("output_suppressed")):
             package = blocked_editorial_package(label, why, evidence_reasons)
             model_route_used = "evidence-gate:block"
         elif static_only:
-            package = static_editorial_package(label, why)
+            package = static_editorial_package(label, why, strategy=outline_strategy)
             model_route_used = f"static-only:{model_route}"
         else:
             prompt = build_editorial_prompt(
@@ -150,7 +151,7 @@ def main() -> int:
                 validate_editorial_package(package)
                 model_route_used = str(response["model_used"])
             except ModelCallError:
-                package = static_editorial_package(label, why)
+                package = static_editorial_package(label, why, strategy=outline_strategy)
                 model_route_used = f"static-template:{model_route}"
 
         title_options = package["title_options"]
@@ -166,9 +167,9 @@ def main() -> int:
             INSERT OR REPLACE INTO editorial_candidates (
                 topic_id, title_options_json, outline_markdown, narrative_draft_markdown,
                 talking_points_json, verification_checklist_json,
-                angle, audience, evidence_status, evidence_reasons_json,
+                evidence_brief_json, angle, audience, evidence_status, evidence_reasons_json,
                 evidence_ui_state, model_route_used, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 topic_id,
@@ -177,6 +178,7 @@ def main() -> int:
                 narrative_draft,
                 json.dumps(talking_points, ensure_ascii=True),
                 json.dumps(checklist, ensure_ascii=True),
+                json.dumps(evidence_brief, ensure_ascii=True),
                 angle,
                 audience,
                 evidence_status,

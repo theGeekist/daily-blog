@@ -1,40 +1,29 @@
+import json
+import os
 from typing import Any
+
+from pydantic import BaseModel, ConfigDict
 
 from orchestrator_utils import ModelCallError, call_model
 
 EVIDENCE_SYNTHESIS_STAGE = "evidence_synthesis"
 
-EVIDENCE_BRIEF_SCHEMA: dict[str, Any] = {
-    "type": "object",
-    "required": [
-        "topic_id",
-        "claim_count",
-        "top_claims",
-        "problem_pressures",
-        "proposed_solutions",
-        "evidence_type_counts",
-        "stance_breakdown",
-        "dominant_pattern",
-        "outline_strategy",
-    ],
-    "properties": {
-        "topic_id": {"type": "string"},
-        "claim_count": {"type": "integer"},
-        "top_claims": {"type": "array", "items": {"type": "string"}},
-        "problem_pressures": {"type": "array", "items": {"type": "string"}},
-        "proposed_solutions": {"type": "array", "items": {"type": "string"}},
-        "evidence_type_counts": {"type": "object"},
-        "stance_breakdown": {"type": "object"},
-        "dominant_pattern": {
-            "type": "string",
-            "enum": ["consensus", "contested", "anecdotal", "data-backed"],
-        },
-        "outline_strategy": {
-            "type": "string",
-            "enum": ["implementation-guide", "analysis", "explainer", "caution"],
-        },
-    },
-}
+
+class EvidenceBrief(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    topic_id: str
+    claim_count: int
+    top_claims: list[str]
+    problem_pressures: list[str]
+    proposed_solutions: list[str]
+    evidence_type_counts: dict[str, int]
+    stance_breakdown: dict[str, int]
+    dominant_pattern: str
+    outline_strategy: str
+
+
+EVIDENCE_BRIEF_SCHEMA: dict[str, Any] = EvidenceBrief.model_json_schema()
 
 
 def synthesize_evidence_brief(
@@ -55,6 +44,8 @@ def synthesize_evidence_brief(
         validated_sources=validated_sources,
         fallback_brief=fallback,
     )
+    if not os.getenv("GOOGLE_API_KEY", "").strip():
+        return fallback, "deterministic-synthesis:no-google-api-key"
 
     try:
         result = call_model(EVIDENCE_SYNTHESIS_STAGE, prompt, schema=EVIDENCE_BRIEF_SCHEMA)
@@ -63,7 +54,7 @@ def synthesize_evidence_brief(
             merged = dict(fallback)
             merged.update(payload)
             merged["topic_id"] = topic_id
-            return merged, str(result.get("model_used", EVIDENCE_SYNTHESIS_STAGE))
+            return _finalize_brief(merged), str(result.get("model_used", EVIDENCE_SYNTHESIS_STAGE))
     except ModelCallError:
         pass
 
@@ -98,6 +89,8 @@ def _build_fallback_brief(
         stance_breakdown[stance] = stance_breakdown.get(stance, 0) + 1
 
     dominant_pattern = _infer_pattern(
+        claim_count=len(claims),
+        source_count=len(validated_sources),
         evidence_type_counts=evidence_type_counts,
         stance_breakdown=stance_breakdown,
     )
@@ -116,6 +109,20 @@ def _build_fallback_brief(
         "dominant_pattern": dominant_pattern,
         "outline_strategy": outline_strategy,
     }
+
+
+def _finalize_brief(candidate: dict[str, Any]) -> dict[str, Any]:
+    brief = EvidenceBrief.model_validate(candidate)
+    dominant_pattern = _infer_pattern(
+        claim_count=max(brief.claim_count, 0),
+        source_count=sum(int(v) for v in brief.stance_breakdown.values()),
+        evidence_type_counts=brief.evidence_type_counts,
+        stance_breakdown=brief.stance_breakdown,
+    )
+    finalized = brief.model_dump()
+    finalized["dominant_pattern"] = dominant_pattern
+    finalized["outline_strategy"] = _infer_strategy(dominant_pattern)
+    return finalized
 
 
 def _build_synthesis_prompt(
@@ -170,7 +177,7 @@ def _build_synthesis_prompt(
             *source_lines,
             "",
             "baseline_inference:",
-            str(fallback_brief),
+            json.dumps(fallback_brief, ensure_ascii=True),
         ]
     )
 
@@ -192,18 +199,25 @@ def _unique_nonempty(values: list[str], limit: int) -> list[str]:
     return out
 
 
-def _infer_pattern(evidence_type_counts: dict[str, int], stance_breakdown: dict[str, int]) -> str:
-    data_count = int(evidence_type_counts.get("data", 0))
-    anecdote_count = int(evidence_type_counts.get("anecdote", 0))
-    contradicts = int(stance_breakdown.get("contradicts", 0))
-    supports = int(stance_breakdown.get("supports", 0))
+def _infer_pattern(
+    claim_count: int,
+    source_count: int,
+    evidence_type_counts: dict[str, int],
+    stance_breakdown: dict[str, int],
+) -> str:
+    if claim_count > 0:
+        data_ratio = int(evidence_type_counts.get("data", 0)) / claim_count
+        anecdote_ratio = int(evidence_type_counts.get("anecdote", 0)) / claim_count
+        if data_ratio > 0.5:
+            return "data-backed"
+        if anecdote_ratio > 0.7:
+            return "anecdotal"
 
-    if data_count >= max(2, anecdote_count):
-        return "data-backed"
-    if contradicts > 0 and supports > 0:
-        return "contested"
-    if anecdote_count > 0 and data_count == 0:
-        return "anecdotal"
+    if source_count > 0:
+        contradict_ratio = int(stance_breakdown.get("contradicts", 0)) / source_count
+        if contradict_ratio > 0.2:
+            return "contested"
+
     return "consensus"
 
 
