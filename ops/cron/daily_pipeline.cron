@@ -1,0 +1,5 @@
+SHELL=/bin/bash
+PATH=/usr/local/bin:/usr/bin:/bin
+
+# Daily full pipeline at 08:00 local time
+0 8 * * * cd /Users/jasonnathan/Repos/daily-blog && python3 run_pipeline.py >> /Users/jasonnathan/Repos/daily-blog/data/pipeline.log 2>&1
