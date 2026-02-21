@@ -70,6 +70,8 @@ def main() -> int:
     discovered_limit = int(os.getenv("ENRICH_DISCOVER_LIMIT", "10"))
     max_known_claim_urls = int(os.getenv("ENRICH_MAX_KNOWN_CLAIM_URLS", "24"))
     max_topics = int(os.getenv("ENRICH_MAX_TOPICS", "0"))
+    min_domain_diversity = int(os.getenv("ENRICH_MIN_DOMAIN_DIVERSITY", "3"))
+    max_per_domain = int(os.getenv("ENRICH_MAX_PER_DOMAIN", "3"))
     processed_topics = 0
     for topic_id, label, keywords_json in topic_rows:
         if max_topics > 0 and processed_topics >= max_topics:
@@ -171,7 +173,12 @@ def main() -> int:
             if credibility_rank(src["credibility_guess"]) > credibility_rank(current_cred):
                 existing["credibility_guess"] = src["credibility_guess"]
 
-        source_map = filter_sources_for_quality(source_map, min_credible_count=3)
+        source_map = filter_sources_for_quality(
+            source_map,
+            min_credible_count=3,
+            min_domain_diversity=min_domain_diversity,
+            max_per_domain=max_per_domain,
+        )
         conn.execute("DELETE FROM enrichment_sources WHERE topic_id = ?", (topic_id,))
         query_terms_json = json.dumps(query_terms, ensure_ascii=True)
         for source in source_map.values():

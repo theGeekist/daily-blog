@@ -67,6 +67,8 @@ def build_editorial_prompt(
     why_it_matters: str,
     time_horizon: str,
     validated_sources: list[dict[str, Any]],
+    evidence_brief: dict[str, Any] | None = None,
+    claims: list[dict[str, str]] | None = None,
 ) -> str:
     source_lines = [
         f"- {src['domain']} | {src['credibility_guess']} | {src['url']}"
@@ -74,6 +76,17 @@ def build_editorial_prompt(
     ]
     if not source_lines:
         source_lines = ["- no validated sources available"]
+    claims = claims or []
+    claim_lines = [
+        (
+            f"- {c.get('headline', '')} | pressure={c.get('problem_pressure', '')} "
+            f"| solution={c.get('proposed_solution', '')} | evidence={c.get('evidence_type', '')}"
+        )
+        for c in claims[:12]
+    ]
+    if not claim_lines:
+        claim_lines = ["- no mapped claims available"]
+    evidence_brief = evidence_brief or {}
 
     return "\n".join(
         [
@@ -90,6 +103,10 @@ def build_editorial_prompt(
             f"- time_horizon: {time_horizon}",
             "- validated_sources:",
             *source_lines,
+            "- mapped_claims:",
+            *claim_lines,
+            "- evidence_brief:",
+            json.dumps(evidence_brief, ensure_ascii=True),
             "",
             "Required JSON shape:",
             "{",

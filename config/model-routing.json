@@ -1,47 +1,31 @@
 {
   "coordinator": {
-    "primary": "codex-5.3",
-    "fallback": "gemini-3-pro"
+    "primary": "opencode:codex-5.3",
+    "fallback": "gemini:gemini-2.0-flash"
   },
   "extractor": {
-    "primary": "ollama:qwen2.5:7b",
-    "fallback": "gemini-3-pro",
-    "local_candidates": [
-      "ollama:qwen2.5:7b",
-      "ollama:qwen2.5:14b",
-      "ollama:llama3.1:8b"
-    ]
+    "primary": "ollama:qwen2.5:14b",
+    "fallback": "ollama:qwen2.5:7b"
   },
   "topic_lifter": {
     "primary": "ollama:qwen2.5:14b",
-    "fallback": "ollama:qwen2.5:7b",
-    "local_candidates": [
-      "ollama:qwen2.5:14b",
-      "ollama:qwen2.5:7b",
-      "ollama:llama3.1:8b"
-    ]
+    "fallback": "ollama:llama3.1:8b"
   },
   "topic_curator": {
     "primary": "ollama:qwen2.5:7b",
-    "fallback": "ollama:llama3.1:8b",
-    "local_candidates": [
-      "ollama:qwen2.5:7b",
-      "ollama:llama3.1:8b",
-      "ollama:mistral-nemo:12b"
-    ]
+    "fallback": "ollama:llama3.1:8b"
+  },
+  "evidence_synthesis": {
+    "primary": "gemini:gemini-2.0-flash",
+    "fallback": "ollama:qwen2.5:14b"
   },
   "enrichment": {
-    "primary": "codex-5.3",
-    "fallback": "glm5"
+    "primary": "ollama:qwen2.5:14b",
+    "fallback": "ollama:llama3.1:8b"
   },
   "editorial": {
-    "primary": "ollama:qwen2.5:14b",
-    "fallback": "codex-5.3",
-    "local_candidates": [
-      "ollama:qwen2.5:14b",
-      "ollama:llama3.1:8b",
-      "ollama:mistral-nemo:12b"
-    ]
+    "primary": "gemini:gemini-2.0-flash",
+    "fallback": "opencode:claude-opus-4-6"
   },
   "ranker": {
     "primary": "deterministic-code",

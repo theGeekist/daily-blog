@@ -17,6 +17,7 @@ from daily_blog.editorial.model_io import (
     validate_editorial_package,
 )
 from daily_blog.editorial.store import init_editorial_table
+from daily_blog.editorial.synthesis import synthesize_evidence_brief
 from daily_blog.editorial.templates import blocked_editorial_package, static_editorial_package
 from orchestrator_utils import ModelCallError, call_model
 
@@ -77,6 +78,27 @@ def main() -> int:
         topic_evidence_types.setdefault(key, set()).add(str(evidence_type or "").strip().lower())
 
     for topic_id, label, why, time_horizon in topics:
+        try:
+            claim_rows = conn.execute(
+                """
+                SELECT c.headline, c.problem_pressure, c.proposed_solution, c.evidence_type
+                FROM claims c
+                JOIN claim_topic_map ctm ON ctm.claim_id = c.claim_id
+                WHERE ctm.topic_id = ?
+                """,
+                (topic_id,),
+            ).fetchall()
+        except sqlite3.OperationalError:
+            claim_rows = []
+        claims = [
+            {
+                "headline": str(headline or ""),
+                "problem_pressure": str(problem_pressure or ""),
+                "proposed_solution": str(proposed_solution or ""),
+                "evidence_type": str(evidence_type or ""),
+            }
+            for headline, problem_pressure, proposed_solution, evidence_type in claim_rows
+        ]
         sources = conn.execute(
             """
             SELECT domain, url, fetched_ok, credibility_guess
@@ -99,6 +121,12 @@ def main() -> int:
             for d, u, fetched_ok, c in sources
             if int(fetched_ok) == 1
         ]
+        evidence_brief, evidence_synthesis_route = synthesize_evidence_brief(
+            topic_id=str(topic_id),
+            topic_label=str(label),
+            claims=claims,
+            validated_sources=valid_sources,
+        )
 
         static_only = os.getenv("EDITORIAL_STATIC_ONLY", "0") == "1"
         if bool(assessment.get("output_suppressed")):
@@ -113,6 +141,8 @@ def main() -> int:
                 why_it_matters=why,
                 time_horizon=time_horizon,
                 validated_sources=valid_sources,
+                evidence_brief=evidence_brief,
+                claims=claims,
             )
             try:
                 response = call_model(EDITORIAL_STAGE, prompt, schema=EDITORIAL_RESPONSE_SCHEMA)
@@ -170,6 +200,7 @@ def main() -> int:
         md_lines.append(f"- evidence_status: {evidence_status} ({evidence_ui_state})")
         md_lines.append(f"- evidence_reasons: {'; '.join(evidence_reasons)}")
         md_lines.append(f"- model_route_used: {model_route_used}")
+        md_lines.append(f"- evidence_synthesis_route: {evidence_synthesis_route}")
         md_lines.append(f"- angle: {angle}")
         md_lines.append(f"- audience: {audience}")
         md_lines.append("- title options:")
@@ -199,6 +230,8 @@ def main() -> int:
                 "evidence_ui_state": evidence_ui_state,
                 "evidence_reasons": evidence_reasons,
                 "evidence_metrics": assessment.get("metrics", {}),
+                "evidence_brief": evidence_brief,
+                "evidence_synthesis_route": evidence_synthesis_route,
             }
         )
 

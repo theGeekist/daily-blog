@@ -8,7 +8,12 @@ version = "0.1.0"
 description = "RSS-first pipeline for daily topic discovery and editorial prep"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "duckduckgo-search>=6.0.0",
+    "google-generativeai>=0.8.0",
+    "instructor>=1.7.0",
+    "ollama>=0.4.0",
+]
 
 [tool.ruff]
 line-length = 100

@@ -1,0 +1,68 @@
+[ingest] Attempt 1/3 route=primary model=opencode/deterministic-code timeout=300s
+[ingest] OK
+OK   https://www.reddit.com/user/chicagojango/m/digitalincome/hot.rss -> 25 items
+OK   https://www.reddit.com/r/programming/hot.rss -> 25 items
+OK   https://www.reddit.com/r/MachineLearning/new.rss -> 25 items
+OK   https://www.reddit.com/r/Wordpress/hot.rss -> 25 items
+OK   https://www.reddit.com/r/AIContentAutomators/hot.rss -> 25 items
+OK   https://www.reddit.com/r/ExperiencedDevs/hot.rss -> 25 items
+OK   https://www.reddit.com/r/linguistics/hot.rss -> 25 items
+OK   https://www.reddit.com/r/etymology/hot.rss -> 25 items
+OK   https://www.reddit.com/r/sales/hot.rss -> 25 items
+---
+Feeds: 9
+Failed feeds: 0
+Fetched mentions: 225
+New DB rows: 30
+JSONL path: data/mentions.jsonl
+SQLite path: data/daily-blog.db
+[score] Attempt 1/3 route=primary model=opencode/deterministic-code timeout=300s
+[score] OK
+Run ID: 20260218T041804Z
+Mentions read: 316
+Mentions after hard rules + dedupe: 281
+Selected candidates: 12
+Board: data/daily_board.md
+Config: config/rules-engine.json
+[extract_claims] Attempt 1/3 route=primary model=ollama/qwen2.5:7b timeout=300s
+[extract_claims] Attempt 2/3 route=fallback model=opencode/gemini-3-pro timeout=300s
+[extract_claims] Attempt 3/3 route=fallback model=opencode/gemini-3-pro timeout=300s
+[extract_claims] FAIL
+stage=extract_claims | attempt=3/3 | route=fallback | model=opencode/gemini-3-pro | timeout_seconds=300 | command=python3 extract_claims.py | stderr=INFO Calling model via CLI
+INFO Calling model via CLI
+INFO Calling model via CLI
+INFO Calling model via CLI
+INFO Calling model via CLI
+INFO Calling model via CLI
+INFO Calling model via CLI
+INFO Calling model via CLI
+INFO Calling model via CLI
+INFO Calling model via CLI
+INFO Calling model via CLI
+INFO Calling model via CLI
+INFO Calling model via CLI
+INFO Calling model via CLI
+INFO Calling model via CLI
+INFO Calling model via CLI
+INFO Calling model via CLI
+INFO Calling model via CLI | traceback=Traceback (most recent call last):
+  File "/Users/jasonnathan/Repos/daily-blog/run_pipeline.py", line 293, in run_stage
+        )
+    
+    ...<5 lines>...
+    ) -> None:
+    ^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.2_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py", line 556, in run
+    stdout, stderr = process.communicate(input, timeout=timeout)
+                     ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.2_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py", line 1220, in communicate
+    stdout, stderr = self._communicate(input, endtime, timeout)
+                     ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.2_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py", line 2153, in _communicate
+    self._check_timeout(endtime, orig_timeout, stdout, stderr)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.2_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py", line 1267, in _check_timeout
+    raise TimeoutExpired(
+    ...<2 lines>...
+            stderr=b''.join(stderr_seq) if stderr_seq else None)
+subprocess.TimeoutExpired: Command '['python3', 'extract_claims.py']' timed out after 300 seconds

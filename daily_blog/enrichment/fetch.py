@@ -1,3 +1,4 @@
+import json
 import os
 import time
 import urllib.parse
@@ -72,61 +73,87 @@ def verify_source_fetch(url: str, timeout_seconds: int = 8) -> bool:
 
 
 def discover_web_sources(topic_label: str, query_terms: list[str], limit: int = 12) -> list[str]:
+    backend = os.getenv("ENRICH_SEARCH_BACKEND", "ddgs").strip().lower()
     query = " ".join([topic_label] + query_terms[:6]).strip()
     if not query:
         return []
 
+    if backend == "searxng":
+        return _discover_searxng(query=query, limit=limit)
+    return _discover_ddgs(query=query, limit=limit)
+
+
+def _discover_ddgs(query: str, limit: int) -> list[str]:
+    try:
+        from duckduckgo_search import DDGS
+    except ImportError:
+        return []
+
+    extracted_urls: list[str] = []
+    try:
+        with DDGS() as ddgs:
+            results = ddgs.text(query, max_results=limit)
+            for row in results:
+                if not isinstance(row, dict):
+                    continue
+                candidate = normalize_url(str(row.get("href", "")))
+                if not candidate:
+                    continue
+                domain = domain_for_url(candidate)
+                if domain.endswith("duckduckgo.com"):
+                    continue
+                extracted_urls.append(candidate)
+    except Exception:
+        return []
+
+    return _dedupe_urls(extracted_urls, limit=limit)
+
+
+def _discover_searxng(query: str, limit: int) -> list[str]:
+    base = os.getenv("SEARXNG_BASE_URL", "http://localhost:8888").rstrip("/")
+    engines = os.getenv("SEARXNG_ENGINES", "google,bing,duckduckgo,brave")
     user_agent = os.getenv(
         "ENRICH_FETCH_USER_AGENT",
         "Mozilla/5.0 (compatible; daily-blog-enrichment/0.2; +https://localhost)",
     )
     timeout_seconds = int(os.getenv("ENRICH_FETCH_TIMEOUT_SECONDS", "10"))
-    encoded_query = urllib.parse.quote_plus(query)
-    search_urls = [
-        f"https://duckduckgo.com/html/?q={encoded_query}",
-        f"https://r.jina.ai/http://duckduckgo.com/html/?q={encoded_query}",
-    ]
 
-    extracted_urls: list[str] = []
-    for search_url in search_urls:
-        try:
-            req = urllib.request.Request(
-                search_url,
-                headers={"User-Agent": user_agent, "Accept": "text/html,*/*;q=0.8"},
-                method="GET",
-            )
-            with urllib.request.urlopen(req, timeout=timeout_seconds) as response:
-                html = response.read().decode("utf-8", errors="ignore")
+    params = urllib.parse.urlencode(
+        {
+            "q": query,
+            "format": "json",
+            "engines": engines,
+            "language": "en-US",
+        }
+    )
+    url = f"{base}/search?{params}"
 
-            for chunk in html.split('href="'):
-                if '"' not in chunk:
-                    continue
-                href = chunk.split('"', 1)[0]
-                candidate = ""
-                if "uddg=" in href:
-                    parsed = urllib.parse.urlparse(href)
-                    qs = urllib.parse.parse_qs(parsed.query)
-                    candidate = urllib.parse.unquote_plus(qs.get("uddg", [""])[0])
-                elif href.startswith("http://") or href.startswith("https://"):
-                    candidate = href
+    try:
+        req = urllib.request.Request(
+            url,
+            headers={"User-Agent": user_agent, "Accept": "application/json,*/*;q=0.8"},
+            method="GET",
+        )
+        with urllib.request.urlopen(req, timeout=timeout_seconds) as response:
+            payload = json.loads(response.read().decode("utf-8", errors="ignore"))
+    except Exception:
+        return []
 
-                normalized = normalize_url(candidate)
-                if not normalized:
-                    continue
-                domain = domain_for_url(normalized)
-                if domain.endswith("duckduckgo.com"):
-                    continue
-                extracted_urls.append(normalized)
-                if len(extracted_urls) >= limit:
-                    break
-            if extracted_urls:
-                break
-        except Exception:
+    results = payload.get("results", []) if isinstance(payload, dict) else []
+    urls: list[str] = []
+    for row in results:
+        if not isinstance(row, dict):
             continue
+        candidate = normalize_url(str(row.get("url", "")))
+        if candidate:
+            urls.append(candidate)
+    return _dedupe_urls(urls, limit=limit)
 
+
+def _dedupe_urls(urls: list[str], limit: int) -> list[str]:
     deduped: list[str] = []
     seen: set[str] = set()
-    for url in extracted_urls:
+    for url in urls:
         if url in seen:
             continue
         seen.add(url)

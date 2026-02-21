@@ -73,12 +73,40 @@ def parse_keywords_json(raw: str) -> list[str]:
 def filter_sources_for_quality(
     source_map: dict[str, dict[str, str | int]],
     min_credible_count: int = 3,
+    min_domain_diversity: int = 3,
+    max_per_domain: int = 3,
 ) -> dict[str, dict[str, str | int]]:
     high_medium_urls = [
         url
         for url, source in source_map.items()
         if credibility_rank(str(source.get("credibility_guess", "low"))) >= 2
     ]
-    if len(high_medium_urls) >= min_credible_count:
-        return {url: source_map[url] for url in high_medium_urls}
-    return source_map
+    candidate_map = (
+        {url: source_map[url] for url in high_medium_urls}
+        if len(high_medium_urls) >= min_credible_count
+        else dict(source_map)
+    )
+
+    # Cap dominance from any single domain while preserving original insertion order.
+    per_domain_count: dict[str, int] = {}
+    capped: dict[str, dict[str, str | int]] = {}
+    for url, source in candidate_map.items():
+        domain = str(source.get("domain", "")).strip().lower() or domain_for_url(url)
+        count = per_domain_count.get(domain, 0)
+        if domain and count >= max_per_domain:
+            continue
+        capped[url] = source
+        if domain:
+            per_domain_count[domain] = count + 1
+
+    domains = {
+        str(source.get("domain", "")).strip().lower() or domain_for_url(url)
+        for url, source in capped.items()
+        if (str(source.get("domain", "")).strip() or domain_for_url(url))
+    }
+
+    if len(domains) >= min_domain_diversity:
+        return capped
+
+    # Diversity not met; fall back to uncapped set so upstream can decide how to handle scarcity.
+    return candidate_map
