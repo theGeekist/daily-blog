@@ -372,14 +372,48 @@ No new overlap with `.sisyphus/plans/` documents. Phases 5–9 address operation
 
 The following external-review items are explicitly tracked and either fixed or queued here even when they overlap internal findings.
 
-- Fixed:
-  - `reason_codes` now use typed machine-consumable enums (no free-text-derived keys).
-  - `fetched_ratio` null contract for zero-source scenarios is implemented in `compute_evidence_assessment`.
-  - dossier emission no longer depends on `candidate_scores` availability; minimal dossiers are emitted with safe defaults.
-  - confidence-threshold default aligned to `TOPIC_CONFIDENCE_THRESHOLD=0.3`.
-- Still planned:
-  - full Phase 10A schema alignment (`editorial_decision_dossier` canonical naming and remaining field contract polish).
-  - dedicated dossier-v2 unit test module and expanded matrix coverage.
+- Fixed (verified against `data/candidates/manual-run/` output 2026-02-22):
+  - `reason_codes` now use typed machine-consumable enums (`EVIDENCE_BLOCK`, `EVIDENCE_WARN`, `TOPIC_UNCERTAIN`, `NO_FETCHED_SOURCES`).
+  - `fetched_ratio=None` when `total_sources==0` in `compute_evidence_assessment`.
+  - Dossier emission no longer gated on `candidate_scores` availability; minimal dossiers emitted with safe defaults.
+  - `TOPIC_CONFIDENCE_THRESHOLD` default aligned to `0.3`.
+
+- New issues found from dossier output review (queued):
+  - Status update (2026-02-22 follow-up): issues A-E below are now implemented.
+
+  **A — `publishability.state="evaluated"` contradicts null scores** (`generate_editorial.py`) ✅ fixed
+  - `state` is derived from `fetched_count > 0` in `evidence.py`, but `corroboration`/`source_diversity` come from `candidate_scores` and can be null independently.
+  - Example: `topic-ai` shows `state="evaluated"`, `source_quality=3.0`, yet `corroboration=null`, `source_diversity=null`, `total=null`.
+  - Fix implemented: emit `"partial"` when any publishability score is null; `"evaluated"` only when all four scores are non-null.
+  - File: `generate_editorial.py` (publishability block assembly).
+
+  **B — `entry_id` falls back to topic slug when no `candidate_scores`** (`generate_editorial.py`) ✅ fixed
+  - Produces structurally hollow dossiers (`source.title="AI"`, empty url/published_at).
+  - Dossier schema is entry-scoped; topic-slug dossiers are semantically wrong.
+  - Fix implemented: added `dossier_scope` (`"entry"`/`"topic"`); topic-scope dossiers now avoid entry-specific source metadata.
+  - File: `generate_editorial.py`.
+
+  **C — `editorial.why_interesting` shows the gate status message, not editorial value** (`generate_editorial.py`) ✅ fixed
+  - Populated from `package["angle"]`, which for blocked topics is `"Evidence gate blocked this recommendation."`.
+  - `why_it_matters` from `topic_clusters` is already in scope as `why` and contains the real editorial rationale.
+  - Fix implemented: `why_interesting` now uses topic-cluster `why_it_matters`, not blocked angle text.
+  - File: `generate_editorial.py` (dossier assembly, `editorial.why_interesting` key).
+
+  **D — Blocked `outline_seed` is identical boilerplate for every blocked topic** (`generate_editorial.py`) ✅ fixed
+  - `hook`, `thesis`, and `sections` come from `blocked_editorial_package` template. No topic-specific content.
+  - A blocked dossier is still useful for remediation planning; seed should derive from actual claims/evidence.
+  - Fix implemented: `outline_seed` now derives from `evidence_brief` and scoped claims even for blocked topics.
+  - File: `generate_editorial.py` (dossier assembly, `editorial.outline_seed` key).
+
+  **E — Duplicate BLOCK reason when `total_sources == 0`** (`evidence.py`) ✅ fixed
+  - `effective_fetched_ratio = 0.0` triggers `fetched_ratio < min_fetched_ratio` as a second BLOCK reason even though `source_count < min_sources` already covers it.
+  - Results in two free-text reasons for zero-source topics in `research_pack.json` `evidence_reasons` list.
+  - Fix implemented: fetched-ratio threshold checks are skipped when `fetched_ratio is None`.
+  - File: `daily_blog/editorial/evidence.py` lines 46–51.
+
+- Still planned (unchanged):
+  - Full Phase 10A schema alignment (`editorial_decision_dossier` canonical naming and remaining field contract polish).
+  - Dedicated `test_candidate_dossier_v2.py` unit test module and expanded matrix coverage.
 
 ### Objective
 

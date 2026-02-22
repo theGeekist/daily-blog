@@ -44,7 +44,7 @@ def compute_evidence_assessment(
         status = "BLOCK"
         reasons.append(f"source_count={total_sources} below minimum {min_sources}")
     effective_fetched_ratio = fetched_ratio if fetched_ratio is not None else 0.0
-    if effective_fetched_ratio < min_fetched_ratio:
+    if fetched_ratio is not None and effective_fetched_ratio < min_fetched_ratio:
         status = "BLOCK"
         reasons.append(
             f"fetched_ratio={effective_fetched_ratio:.2f} below minimum {min_fetched_ratio:.2f}"
@@ -57,7 +57,7 @@ def compute_evidence_assessment(
         reasons.append("only anecdotal claims with insufficient source count")
 
     if status != "BLOCK":
-        if effective_fetched_ratio < warn_min_fetched_ratio:
+        if fetched_ratio is not None and effective_fetched_ratio < warn_min_fetched_ratio:
             status = "WARN"
             reasons.append(
                 "fetched_ratio="

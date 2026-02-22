@@ -412,6 +412,7 @@ def main() -> int:
             }
         )
 
+        dossier_scope = "entry" if entry_id else "topic"
         if not entry_id:
             entry_id = f"topic-{_safe_slug(str(topic_id))}"
         discovery_total = round(float(candidate_row[1] or 0.0), 4) if candidate_row else 0.0
@@ -436,108 +437,150 @@ def main() -> int:
         if not reason_codes:
             reason_codes.append("NONE")
 
+        evidence_coverage = assessment.get("metrics", {}).get("fetched_ratio")
+        source_quality = assessment.get("metrics", {}).get("avg_credibility")
+        corroboration = (
+            None if fetched_count == 0 or not candidate_row else float(candidate_row[5] or 0.0)
+        )
+        source_diversity = (
+            None if fetched_count == 0 or not candidate_row else float(candidate_row[6] or 0.0)
+        )
+        publishability_total = (
+            None
+            if fetched_count == 0 or not candidate_row
+            else round((float(candidate_row[5] or 0) + float(candidate_row[6] or 0)) / 2, 4)
+        )
+        publishability_values = (
+            evidence_coverage,
+            source_quality,
+            corroboration,
+            source_diversity,
+        )
+        if all(value is not None for value in publishability_values):
+            publishability_state = "evaluated"
+        elif any(value is not None for value in publishability_values):
+            publishability_state = "partial"
+        else:
+            publishability_state = "not_evaluated"
+
+        top_claims = [
+            str(item).strip()
+            for item in evidence_brief.get("top_claims", [])
+            if str(item).strip()
+        ]
+        if not top_claims:
+            top_claims = [str(c.get("headline", "")).strip() for c in claims if c.get("headline")]
+        outline_sections = top_claims[:5]
+        if not outline_sections:
+            outline_sections = [
+                line.strip("# ").strip() for line in outline.splitlines() if line.startswith("## ")
+            ][:5]
+
         dossier = {
-                "meta": {
-                    "run_id": run_id,
-                    "entry_id": entry_id,
-                    "generated_at": now,
-                    "schema_version": "2.0.0",
+            "meta": {
+                "run_id": run_id,
+                "entry_id": entry_id,
+                "dossier_scope": dossier_scope,
+                "generated_at": now,
+                "schema_version": "2.0.0",
+            },
+            "source": {
+                "platform": (
+                    "reddit"
+                    if dossier_scope == "entry" and entry_id.startswith("t3_")
+                    else ("rss" if dossier_scope == "entry" else "")
+                ),
+                "url": (
+                    str(candidate_row[9] or "")
+                    if dossier_scope == "entry" and candidate_row
+                    else ""
+                ),
+                "title": (
+                    str(candidate_row[8] or "")
+                    if dossier_scope == "entry" and candidate_row
+                    else str(label or "")
+                ),
+                "published_at": (
+                    str(candidate_row[12] or "")
+                    if dossier_scope == "entry" and candidate_row
+                    else ""
+                ),
+                "engagement": {},
+            },
+            "extraction": {
+                "candidate_type": "practitioner_help_request"
+                if "help" in str(candidate_row[11] if candidate_row else "").lower()
+                else "news_event",
+                "post_intent": ["showcase", "request_feedback"]
+                if "feedback" in str(candidate_row[11] if candidate_row else "").lower()
+                else ["discuss"],
+                "domains": [str(slug or "misc")],
+                "stack_detected": [],
+                "core_problem": (claims[0].get("problem_pressure", "") if claims else ""),
+                "solution_pattern": (claims[0].get("proposed_solution", "") if claims else ""),
+                "author_ask": [],
+                "artifacts_present": [],
+            },
+            "classification": {
+                "topic_primary": str(slug or "misc"),
+                "topic_secondary": [],
+                "topic_confidence": topic_confidence,
+                "vertical_fit": {
+                    "primary": "Tame the Tech",
+                    "cluster": "Where the User Begins",
                 },
-                "source": {
-                    "platform": "reddit" if entry_id.startswith("t3_") else "rss",
-                    "url": str(candidate_row[9] or "") if candidate_row else "",
-                    "title": str(candidate_row[8] or "") if candidate_row else str(label or ""),
-                    "published_at": str(candidate_row[12] or "") if candidate_row else "",
-                    "engagement": {},
+                "reader_level": "intermediate",
+            },
+            "scoring": {
+                "discovery": {
+                    "total": discovery_total,
+                    "novelty": float(candidate_row[3] or 0.0) if candidate_row else 0.0,
+                    "recency": float(candidate_row[4] or 0.0) if candidate_row else 0.0,
+                    "actionability": float(candidate_row[7] or 0.0) if candidate_row else 0.0,
                 },
-                "extraction": {
-                    "candidate_type": "practitioner_help_request"
-                    if "help" in str(candidate_row[11] if candidate_row else "").lower()
-                    else "news_event",
-                    "post_intent": ["showcase", "request_feedback"]
-                    if "feedback" in str(candidate_row[11] if candidate_row else "").lower()
-                    else ["discuss"],
-                    "domains": [str(slug or "misc")],
-                    "stack_detected": [],
-                    "core_problem": (claims[0].get("problem_pressure", "") if claims else ""),
-                    "solution_pattern": (claims[0].get("proposed_solution", "") if claims else ""),
-                    "author_ask": [],
-                    "artifacts_present": [],
+                "publishability": {
+                    "state": publishability_state,
+                    "evidence_coverage": evidence_coverage,
+                    "source_quality": source_quality,
+                    "corroboration": corroboration,
+                    "source_diversity": source_diversity,
+                    "total": publishability_total,
                 },
-                "classification": {
-                    "topic_primary": str(slug or "misc"),
-                    "topic_secondary": [],
-                    "topic_confidence": topic_confidence,
-                    "vertical_fit": {
-                        "primary": "Tame the Tech",
-                        "cluster": "Where the User Begins",
-                    },
-                    "reader_level": "intermediate",
+                "editorial_recommendation": recommendation,
+            },
+            "evidence": {
+                "status": evidence_status.lower(),
+                "ui_state": evidence_ui_state,
+                "reason_codes": list(dict.fromkeys(reason_codes)),
+                "verified_sources": valid_sources,
+            },
+            "editorial": {
+                "why_interesting": str(why or "").strip(),
+                "angles": [
+                    {"title": t, "type": "candidate-specific", "fit_score": 0.75}
+                    for t in title_options[:3]
+                ],
+                "verification_plan": checklist,
+                "outline_seed": {
+                    "hook": (
+                        top_claims[0]
+                        if top_claims
+                        else (claims[0].get("headline", "") if claims else "")
+                    ),
+                    "thesis": (
+                        "Dominant evidence pattern: "
+                        f"{evidence_brief.get('dominant_pattern', 'unknown')}. "
+                        f"Strategy: {evidence_brief.get('outline_strategy', 'explainer')}."
+                    ),
+                    "sections": outline_sections,
                 },
-                "scoring": {
-                    "discovery": {
-                        "total": discovery_total,
-                        "novelty": float(candidate_row[3] or 0.0) if candidate_row else 0.0,
-                        "recency": float(candidate_row[4] or 0.0) if candidate_row else 0.0,
-                        "actionability": float(candidate_row[7] or 0.0) if candidate_row else 0.0,
-                    },
-                    "publishability": {
-                        "state": assessment.get("metrics", {}).get(
-                            "publishability_state", "not_evaluated"
-                        ),
-                        "evidence_coverage": assessment.get("metrics", {}).get("fetched_ratio"),
-                        "source_quality": assessment.get("metrics", {}).get("avg_credibility"),
-                        "corroboration": (
-                            None
-                            if fetched_count == 0 or not candidate_row
-                            else float(candidate_row[5] or 0.0)
-                        ),
-                        "source_diversity": (
-                            None
-                            if fetched_count == 0 or not candidate_row
-                            else float(candidate_row[6] or 0.0)
-                        ),
-                        "total": (
-                            None
-                            if fetched_count == 0 or not candidate_row
-                            else round(
-                                (float(candidate_row[5] or 0) + float(candidate_row[6] or 0))
-                                / 2,
-                                4,
-                            )
-                        ),
-                    },
-                    "editorial_recommendation": recommendation,
-                },
-                "evidence": {
-                    "status": evidence_status.lower(),
-                    "ui_state": evidence_ui_state,
-                    "reason_codes": list(dict.fromkeys(reason_codes)),
-                    "verified_sources": valid_sources,
-                },
-                "editorial": {
-                    "why_interesting": angle,
-                    "angles": [
-                        {"title": t, "type": "candidate-specific", "fit_score": 0.75}
-                        for t in title_options[:3]
-                    ],
-                    "verification_plan": checklist,
-                    "outline_seed": {
-                        "hook": talking_points[0] if talking_points else "",
-                        "thesis": talking_points[1] if len(talking_points) > 1 else "",
-                        "sections": [
-                            line.strip("# ").strip()
-                            for line in outline.splitlines()
-                            if line.startswith("## ")
-                        ][:5],
-                    },
-                },
-                "raw_capture": {
-                    "summary": str(candidate_row[11] or "") if candidate_row else "",
-                    "comments_snapshot": [],
-                    "media_links": [],
-                },
-            }
+            },
+            "raw_capture": {
+                "summary": str(candidate_row[11] or "") if candidate_row else "",
+                "comments_snapshot": [],
+                "media_links": [],
+            },
+        }
         conn.execute(
             """
             INSERT OR REPLACE INTO candidate_dossiers (
