@@ -24,6 +24,7 @@ data/pipeline.log
 data/daily_board.md
 data/top_outlines.md
 data/research_pack.json
+data/candidates/
 
 # Packaging/build artifacts
 *.egg-info/
