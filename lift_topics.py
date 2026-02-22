@@ -228,7 +228,8 @@ def assign_topics_with_model(
     if missing:
         logger.warning(
             "Topic lifter missed %d/%d claims; filling with heuristic",
-            len(missing), len(claim_ids),
+            len(missing),
+            len(claim_ids),
         )
         claim_lookup = {str(row[0]): row for row in batch_claims}
         for cid in missing:

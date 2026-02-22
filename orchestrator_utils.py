@@ -4,6 +4,7 @@ import logging
 import os
 import re
 import subprocess
+import time
 from json import JSONDecodeError
 from json.decoder import JSONDecoder
 from pathlib import Path
@@ -13,8 +14,12 @@ DEFAULT_MODEL_ROUTING_PATH = Path(__file__).resolve().parent / "config" / "model
 DEFAULT_PROMPTS_PATH = Path(__file__).resolve().parent / "config" / "prompts.json"
 DEFAULT_TIMEOUT_SECONDS = 120
 DEFAULT_SCHEMA_RETRIES = 2
+DEFAULT_GEMINI_QUOTA_BACKPRESSURE_SECONDS = 300
+DEFAULT_GEMINI_MISSING_KEY_BACKPRESSURE_SECONDS = 1800
 
 logger = logging.getLogger(__name__)
+_MODEL_BACKPRESSURE_UNTIL: dict[str, float] = {}
+_MODEL_BACKPRESSURE_REASON: dict[str, str] = {}
 
 
 class ModelCallError(RuntimeError):
@@ -38,9 +43,7 @@ def call_model(stage_name: str, prompt: str, schema: dict | None = None) -> dict
     if not isinstance(stage_config, dict):
         raise ModelCallError(f"Stage '{stage_name}' not found in {routing_path}")
 
-    primary = stage_config.get("primary")
-    fallback = stage_config.get("fallback")
-    candidates = [m for m in (primary, fallback) if isinstance(m, str) and m.strip()]
+    candidates = _candidate_models(stage_config)
 
     if not candidates:
         raise ModelCallError(f"Stage '{stage_name}' has no usable primary/fallback model")
@@ -48,6 +51,16 @@ def call_model(stage_name: str, prompt: str, schema: dict | None = None) -> dict
     failures: list[str] = []
 
     for model_name in candidates:
+        blocked_message = _model_backpressure_message(model_name)
+        if blocked_message:
+            failures.append(f"{model_name}: ModelCallError: {blocked_message}")
+            logger.warning(
+                "Skipping model '%s' for stage '%s' due to backpressure: %s",
+                model_name,
+                stage_name,
+                blocked_message,
+            )
+            continue
         try:
             parsed_content = _invoke_with_retries(
                 model_name=model_name,
@@ -60,12 +73,31 @@ def call_model(stage_name: str, prompt: str, schema: dict | None = None) -> dict
             message = f"{model_name}: {type(exc).__name__}: {exc}"
             failures.append(message)
             logger.warning("Model invocation failed for stage '%s': %s", stage_name, message)
+            _maybe_apply_model_backpressure(model_name=model_name, error=str(exc))
 
     joined_failures = " | ".join(failures)
     raise ModelCallError(
         "All models failed for stage "
         f"'{stage_name}' (primary then fallback). Details: {joined_failures}"
     )
+
+
+def _candidate_models(stage_config: dict[str, Any]) -> list[str]:
+    primary = stage_config.get("primary")
+    fallback = stage_config.get("fallback")
+    fallbacks = stage_config.get("fallbacks")
+
+    candidates: list[str] = []
+    for model in (primary, fallback):
+        if isinstance(model, str) and model.strip():
+            candidates.append(model.strip())
+    if isinstance(fallbacks, list):
+        for model in fallbacks:
+            if isinstance(model, str) and model.strip():
+                candidates.append(model.strip())
+
+    # Preserve order while removing duplicates.
+    return list(dict.fromkeys(candidates))
 
 
 def _invoke_with_retries(
@@ -105,6 +137,7 @@ def _dispatch_model(model_name: str, prompt: str, schema: dict | None) -> str:
     dispatch_map: dict[str, Callable[[str, str, dict | None], str]] = {
         "ollama": _dispatch_ollama,
         "gemini": _dispatch_gemini,
+        "gemini-cli": _dispatch_gemini_cli,
         "opencode": _dispatch_opencode,
         "openclaw": _dispatch_openclaw,
     }
@@ -120,12 +153,12 @@ def _parse_model_ref(model_name: str) -> tuple[str, str]:
 
     if ":" in model_name:
         provider, model_id = model_name.split(":", 1)
-        if provider in {"ollama", "gemini", "opencode", "openclaw"}:
+        if provider in {"ollama", "gemini", "gemini-cli", "opencode", "openclaw"}:
             return provider, model_id
 
     if "/" in model_name:
         provider, model_id = model_name.split("/", 1)
-        if provider in {"ollama", "gemini", "opencode", "openclaw"}:
+        if provider in {"ollama", "gemini", "gemini-cli", "opencode", "openclaw"}:
             return provider, model_id
 
     return "opencode", model_name
@@ -167,8 +200,7 @@ def _dispatch_gemini(model_name: str, prompt: str, schema: dict | None) -> str:
         from google.genai import types
     except ImportError as exc:
         raise ModelCallError(
-            "Missing dependency 'google-genai'. "
-            "Install project dependencies for Gemini routes."
+            "Missing dependency 'google-genai'. Install project dependencies for Gemini routes."
         ) from exc
 
     use_vertex = os.getenv("GOOGLE_GENAI_USE_VERTEXAI", "0") == "1"
@@ -182,7 +214,9 @@ def _dispatch_gemini(model_name: str, prompt: str, schema: dict | None) -> str:
         client = genai.Client(vertexai=True, project=project, location=location)
         logger.debug(
             "Using Vertex AI ADC for Gemini route '%s' (project=%s, location=%s)",
-            model_name, project, location,
+            model_name,
+            project,
+            location,
         )
     else:
         api_key = os.getenv("GOOGLE_API_KEY", "").strip()
@@ -219,6 +253,55 @@ def _dispatch_gemini(model_name: str, prompt: str, schema: dict | None) -> str:
     if not content:
         raise ModelCallError(f"Gemini returned empty output for model '{model_name}'")
     return content
+
+
+def _dispatch_gemini_cli(model_name: str, prompt: str, schema: dict | None) -> str:
+    if schema is not None:
+        logger.warning(
+            "Schema not enforced for gemini-cli provider; "
+            "relying on prompt and post-parse validation"
+        )
+    provider, model_id = _parse_model_ref(model_name)
+    if provider != "gemini-cli":
+        raise ModelCallError(f"Invalid gemini-cli model route '{model_name}'")
+
+    command = [
+        "gemini",
+        "--model",
+        model_id,
+        "--prompt",
+        prompt,
+        "--output-format",
+        "text",
+    ]
+    logger.info("Calling model via Gemini CLI", extra={"model": model_id})
+
+    try:
+        completed = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            timeout=DEFAULT_TIMEOUT_SECONDS,
+            check=False,
+        )
+    except FileNotFoundError as exc:
+        raise ModelCallError("CLI tool not found: gemini") from exc
+    except subprocess.TimeoutExpired as exc:
+        raise ModelCallError(
+            f"CLI call timed out after {DEFAULT_TIMEOUT_SECONDS}s for model '{model_id}'"
+        ) from exc
+
+    output = (completed.stdout or "").strip()
+    stderr = (completed.stderr or "").strip()
+    combined = "\n".join(part for part in (output, stderr) if part)
+    if completed.returncode != 0:
+        raise ModelCallError(
+            f"Gemini CLI returned non-zero status {completed.returncode} for model '{model_id}'. "
+            f"Output: {combined or '<empty>'}"
+        )
+    if not output:
+        raise ModelCallError(f"Gemini CLI returned empty output for model '{model_id}'")
+    return output
 
 
 def _sanitize_gemini_schema(value: Any) -> Any:
@@ -353,7 +436,7 @@ def _extract_json_payload(text: str) -> Any:
 
 
 def _unwrap_single_object_array(value: Any) -> Any:
-    """Unwrap ``[{...}]`` → ``{...}`` — opencode and some models wrap output in a single-item array."""
+    """Unwrap ``[{...}]`` to ``{...}`` for models that wrap object payloads in an array."""
     if isinstance(value, list) and len(value) == 1 and isinstance(value[0], dict):
         logger.debug("Unwrapping single-item array from model output")
         return value[0]
@@ -416,3 +499,61 @@ def _assert_type(instance: Any, expected: str, path: str) -> None:
             "Schema validation failed at "
             f"{path}: expected {expected}, got {type(instance).__name__}"
         )
+
+
+def _model_backpressure_message(model_name: str) -> str:
+    until = _MODEL_BACKPRESSURE_UNTIL.get(model_name)
+    if until is None:
+        return ""
+    now = time.monotonic()
+    if now >= until:
+        _MODEL_BACKPRESSURE_UNTIL.pop(model_name, None)
+        _MODEL_BACKPRESSURE_REASON.pop(model_name, None)
+        return ""
+    remaining = max(1, int(until - now))
+    reason = _MODEL_BACKPRESSURE_REASON.get(model_name, "temporary provider backpressure")
+    return f"{reason}; retry in ~{remaining}s"
+
+
+def _maybe_apply_model_backpressure(model_name: str, error: str) -> None:
+    provider, _ = _parse_model_ref(model_name)
+    if provider != "gemini":
+        return
+
+    message = error.lower()
+    cooldown_seconds = 0
+    reason = ""
+
+    if "google_api_key is required" in message:
+        cooldown_seconds = int(
+            os.getenv(
+                "GEMINI_MISSING_KEY_BACKPRESSURE_SECONDS",
+                str(DEFAULT_GEMINI_MISSING_KEY_BACKPRESSURE_SECONDS),
+            )
+        )
+        reason = "missing GOOGLE_API_KEY for gemini route"
+    elif "resource_exhausted" in message or "quota exceeded" in message or "429" in message:
+        cooldown_seconds = int(
+            os.getenv(
+                "GEMINI_QUOTA_BACKPRESSURE_SECONDS",
+                str(DEFAULT_GEMINI_QUOTA_BACKPRESSURE_SECONDS),
+            )
+        )
+        reason = "gemini quota/rate-limit backpressure"
+
+    if cooldown_seconds <= 0:
+        return
+
+    until = time.monotonic() + cooldown_seconds
+    existing_until = _MODEL_BACKPRESSURE_UNTIL.get(model_name, 0.0)
+    if until <= existing_until:
+        return
+
+    _MODEL_BACKPRESSURE_UNTIL[model_name] = until
+    _MODEL_BACKPRESSURE_REASON[model_name] = reason
+    logger.warning(
+        "Backpressure enabled for model '%s' for %ss (%s)",
+        model_name,
+        cooldown_seconds,
+        reason,
+    )

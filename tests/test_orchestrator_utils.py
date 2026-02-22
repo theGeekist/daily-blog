@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 from orchestrator_utils import (
     ModelCallError,
     ModelOutputValidationError,
+    _candidate_models,
     _extract_json_payload,
     _invoke_with_retries,
 )
@@ -30,6 +31,26 @@ def _make_genai_mock() -> tuple[MagicMock, MagicMock, dict[str, ModuleType]]:
 
 
 class TestOrchestratorUtils(unittest.TestCase):
+    def test_candidate_models_supports_fallback_chain(self) -> None:
+        models = _candidate_models(
+            {
+                "primary": "gemini:gemini-2.0-flash",
+                "fallback": "gemini-cli:gemini-2.5-flash-lite",
+                "fallbacks": [
+                    "ollama:llama3.2:latest",
+                    "gemini-cli:gemini-2.5-flash-lite",
+                ],
+            }
+        )
+        self.assertEqual(
+            models,
+            [
+                "gemini:gemini-2.0-flash",
+                "gemini-cli:gemini-2.5-flash-lite",
+                "ollama:llama3.2:latest",
+            ],
+        )
+
     def test_no_retry_for_hard_failure(self) -> None:
         with patch(
             "orchestrator_utils._dispatch_model",
@@ -76,7 +97,6 @@ class TestOrchestratorUtils(unittest.TestCase):
                     retries=1,
                 )
 
-
     def test_extract_json_unwraps_single_item_array(self) -> None:
         result = _extract_json_payload('[{"key": "value", "count": 3}]')
         self.assertEqual(result, {"key": "value", "count": 3})
@@ -107,8 +127,9 @@ class TestDispatchGemini(unittest.TestCase):
     ) -> None:
         from orchestrator_utils import _dispatch_gemini
 
-        with patch.dict(sys.modules, modules, clear=False), patch.dict(
-            os.environ, env, clear=False
+        with (
+            patch.dict(sys.modules, modules, clear=False),
+            patch.dict(os.environ, env, clear=False),
         ):
             _dispatch_gemini(model, prompt, None)
 

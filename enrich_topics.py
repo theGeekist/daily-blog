@@ -4,6 +4,7 @@ import logging
 import os
 import sqlite3
 import sys
+import time
 from pathlib import Path
 
 from daily_blog.core.env import load_env_file
@@ -72,11 +73,19 @@ def main() -> int:
     max_topics = int(os.getenv("ENRICH_MAX_TOPICS", "0"))
     min_domain_diversity = int(os.getenv("ENRICH_MIN_DOMAIN_DIVERSITY", "3"))
     max_per_domain = int(os.getenv("ENRICH_MAX_PER_DOMAIN", "3"))
+    progress_every = max(1, int(os.getenv("ENRICH_PROGRESS_EVERY", "1")))
     processed_topics = 0
-    for topic_id, label, keywords_json in topic_rows:
+    total_topics = len(topic_rows) if max_topics <= 0 else min(len(topic_rows), max_topics)
+    started_at = time.monotonic()
+    print(f"[enrich_topics] Processing {total_topics} topics", flush=True)
+    for topic_idx, (topic_id, label, keywords_json) in enumerate(topic_rows, start=1):
         if max_topics > 0 and processed_topics >= max_topics:
             break
         processed_topics += 1
+        print(
+            f"[enrich_topics] topic={processed_topics}/{total_topics} id={topic_id} label={label}",
+            flush=True,
+        )
         keywords = parse_keywords_json(keywords_json)
         query_terms = default_query_terms(label, keywords)
         claim_urls = conn.execute(
@@ -181,6 +190,7 @@ def main() -> int:
         )
         conn.execute("DELETE FROM enrichment_sources WHERE topic_id = ?", (topic_id,))
         query_terms_json = json.dumps(query_terms, ensure_ascii=True)
+        topic_rows_written = 0
         for source in source_map.values():
             upsert_enrichment_source(
                 conn=conn,
@@ -192,10 +202,25 @@ def main() -> int:
                 model_route_used=model_route_used,
             )
             rows_written += 1
+            topic_rows_written += 1
+
+        if processed_topics % progress_every == 0 or processed_topics == total_topics:
+            elapsed = max(0.001, time.monotonic() - started_at)
+            rate = processed_topics / elapsed
+            print(
+                "[enrich_topics] "
+                f"topic_complete={processed_topics}/{total_topics} "
+                f"topic_rows={topic_rows_written} "
+                f"candidate_urls={len(candidate_urls)} "
+                f"discovered_urls={len(discovered_urls)} "
+                f"model_route={model_route_used} "
+                f"rate={rate:.2f} topics/s",
+                flush=True,
+            )
 
     conn.commit()
     conn.close()
-    print(f"Enrichment rows written: {rows_written}")
+    print(f"Enrichment rows written: {rows_written}", flush=True)
     return 0
 
 

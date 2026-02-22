@@ -7,6 +7,7 @@ import os
 import re
 import sqlite3
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -243,17 +244,25 @@ def main() -> int:
     conn = sqlite3.connect(sqlite_path)
     init_claims_table(conn)
     max_mentions = int(os.getenv("EXTRACT_MAX_MENTIONS", "300"))
+    progress_every = max(1, int(os.getenv("EXTRACT_PROGRESS_EVERY", "25")))
     mentions = read_mentions(conn, limit=max_mentions)
     now = now_iso()
+    started_at = time.monotonic()
 
     rows: list[tuple] = []
-    for entry_id, title, url, summary in mentions:
+    fallback_count = 0
+    skipped_quality_count = 0
+    total_mentions = len(mentions)
+    print(f"[extract_claims] Processing {total_mentions} mentions", flush=True)
+    for idx, (entry_id, title, url, summary) in enumerate(mentions, start=1):
         extracted, model_route_used = extract_claim(
             entry_id=entry_id,
             title=title or "",
             url=url or "",
             summary=summary or "",
         )
+        if model_route_used == "heuristic-fallback":
+            fallback_count += 1
         headline = str(extracted.get("headline", "")).strip()
         who_cares = str(extracted.get("who_cares", "")).strip()
         if not headline or not who_cares:
@@ -261,6 +270,7 @@ def main() -> int:
                 "Skipping entry_id=%s due to quality gate failure (headline/who_cares missing)",
                 entry_id,
             )
+            skipped_quality_count += 1
             continue
 
         problem = str(extracted.get("problem_pressure", "")).strip() or infer_problem(
@@ -289,10 +299,25 @@ def main() -> int:
                 now,
             )
         )
+        if idx % progress_every == 0 or idx == total_mentions:
+            elapsed = max(0.001, time.monotonic() - started_at)
+            rate = idx / elapsed
+            print(
+                "[extract_claims] "
+                f"progress={idx}/{total_mentions} "
+                f"rows_ready={len(rows)} "
+                f"fallbacks={fallback_count} "
+                f"skipped={skipped_quality_count} "
+                f"rate={rate:.1f}/s",
+                flush=True,
+            )
 
     count = upsert_claims(conn, rows)
     conn.close()
-    print(f"Claims upserted: {count}")
+    print(
+        f"Claims upserted: {count} (fallbacks={fallback_count}, skipped={skipped_quality_count})",
+        flush=True,
+    )
     return 0
 
 

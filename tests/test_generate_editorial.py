@@ -288,12 +288,16 @@ class TestGenerateEditorial(unittest.TestCase):
             "GOOGLE_API_KEY": "",
         }
 
-        with patch.dict(os.environ, env, clear=False), patch(
-            "generate_editorial.call_model",
-            side_effect=fake_call_model,
-        ), patch(
-            "daily_blog.editorial.synthesis.call_model",
-            side_effect=fake_call_model,
+        with (
+            patch.dict(os.environ, env, clear=False),
+            patch(
+                "generate_editorial.call_model",
+                side_effect=fake_call_model,
+            ),
+            patch(
+                "daily_blog.editorial.synthesis.call_model",
+                side_effect=fake_call_model,
+            ),
         ):
             rc = generate_editorial.main()
         self.assertEqual(rc, 0)
@@ -313,7 +317,6 @@ class TestGenerateEditorial(unittest.TestCase):
         self.assertEqual(model_route_used, "gemini:gemini-2.0-flash")
         brief = json.loads(evidence_brief_json)
         self.assertEqual(brief["outline_strategy"], "implementation-guide")
-
 
     def test_misc_topic_skipped_by_default(self) -> None:
         import generate_editorial
@@ -375,10 +378,7 @@ class TestGenerateEditorial(unittest.TestCase):
 
         conn = sqlite3.connect(self.db)
         slugs = {
-            row[0]
-            for row in conn.execute(
-                "SELECT topic_id FROM editorial_candidates"
-            ).fetchall()
+            row[0] for row in conn.execute("SELECT topic_id FROM editorial_candidates").fetchall()
         }
         conn.close()
         self.assertNotIn("misc", slugs)
@@ -391,10 +391,7 @@ class TestGenerateEditorial(unittest.TestCase):
 
         conn = sqlite3.connect(self.db)
         slugs = {
-            row[0]
-            for row in conn.execute(
-                "SELECT topic_id FROM editorial_candidates"
-            ).fetchall()
+            row[0] for row in conn.execute("SELECT topic_id FROM editorial_candidates").fetchall()
         }
         conn.close()
         self.assertIn("misc", slugs)

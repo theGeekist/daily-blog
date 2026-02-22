@@ -14,5 +14,7 @@ def load_env_file(path: Path) -> None:
         key, value = line.split("=", 1)
         key = key.strip()
         value = value.strip().strip('"').strip("'")
-        if key and key not in os.environ:
+        # Treat empty/whitespace env values as unset so .env can fill them.
+        current = os.environ.get(key, "")
+        if key and (key not in os.environ or not current.strip()):
             os.environ[key] = value

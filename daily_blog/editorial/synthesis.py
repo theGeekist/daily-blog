@@ -150,8 +150,7 @@ def _build_synthesis_prompt(
         source_cred = str(src.get("credibility_guess", ""))
         source_url = str(src.get("url", ""))
         source_lines.append(
-            f"- domain={source_domain} | stance={source_stance} | "
-            f"cred={source_cred} | {source_url}"
+            f"- domain={source_domain} | stance={source_stance} | cred={source_cred} | {source_url}"
         )
 
     if not claim_lines:

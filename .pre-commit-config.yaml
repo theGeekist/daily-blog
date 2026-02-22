@@ -9,17 +9,18 @@ repos:
         args: [--fix, --exit-non-zero-on-fix]
       - id: ruff-format
 
-  - repo: https://github.com/detachhead/basedpyright
-    rev: v1.31.0
-    hooks:
-      - id: basedpyright
-        additional_dependencies: []
-
   - repo: local
     hooks:
+      - id: basedpyright-local
+        name: basedpyright (.venv)
+        entry: >-
+          bash -lc "test -x .venv/bin/basedpyright || { echo 'Missing .venv or basedpyright. Run make setup'; exit 1; }; .venv/bin/basedpyright"
+        language: system
+        pass_filenames: false
       - id: unittest-fast-suite
         name: unittest fast suite (.venv)
-        entry: bash -lc 'test -x .venv/bin/python || { echo "Missing .venv. Run: make setup"; exit 1; }; .venv/bin/python tests/run_suites.py precommit'
+        entry: >-
+          bash -lc "test -x .venv/bin/python || { echo 'Missing .venv. Run make setup'; exit 1; }; .venv/bin/python tests/run_suites.py precommit"
         language: system
         pass_filenames: false
 

@@ -131,6 +131,7 @@ class TestAssignTopicsWithModel(unittest.TestCase):
 
     def test_schema_omits_claim_id_enum(self) -> None:
         from lift_topics import build_assignment_schema
+
         schema = build_assignment_schema(topic_slugs=["ai", "engineering", "misc"])
         item_props = schema["properties"]["assignments"]["items"]["properties"]
         self.assertNotIn("enum", item_props["claim_id"])
@@ -138,11 +139,14 @@ class TestAssignTopicsWithModel(unittest.TestCase):
 
     def test_all_assigned_returns_model_route(self) -> None:
         from lift_topics import assign_topics_with_model
-        response = self._fake_model([
-            {"claim_id": "id-1", "topic_slug": "ai"},
-            {"claim_id": "id-2", "topic_slug": "engineering"},
-            {"claim_id": "id-3", "topic_slug": "business"},
-        ])
+
+        response = self._fake_model(
+            [
+                {"claim_id": "id-1", "topic_slug": "ai"},
+                {"claim_id": "id-2", "topic_slug": "engineering"},
+                {"claim_id": "id-3", "topic_slug": "business"},
+            ]
+        )
         with patch("lift_topics.call_model", return_value=response):
             result, route = assign_topics_with_model(self.BATCH, self.TOPICS)
         self.assertEqual(result, {"id-1": "ai", "id-2": "engineering", "id-3": "business"})
@@ -150,38 +154,47 @@ class TestAssignTopicsWithModel(unittest.TestCase):
 
     def test_partial_response_fills_missing_with_heuristic(self) -> None:
         from lift_topics import assign_topics_with_model
+
         # Model only assigns id-1 and id-2; id-3 is missing
-        response = self._fake_model([
-            {"claim_id": "id-1", "topic_slug": "ai"},
-            {"claim_id": "id-2", "topic_slug": "engineering"},
-        ])
+        response = self._fake_model(
+            [
+                {"claim_id": "id-1", "topic_slug": "ai"},
+                {"claim_id": "id-2", "topic_slug": "engineering"},
+            ]
+        )
         with patch("lift_topics.call_model", return_value=response):
             result, route = assign_topics_with_model(self.BATCH, self.TOPICS)
-        self.assertIn("id-3", result)          # filled by heuristic
+        self.assertIn("id-3", result)  # filled by heuristic
         self.assertIn("partial-heuristic", route)
 
     def test_hallucinated_claim_id_is_skipped(self) -> None:
         from lift_topics import assign_topics_with_model
+
         # Model returns id-1 correctly but also hallucinates "fake-id"
-        response = self._fake_model([
-            {"claim_id": "id-1", "topic_slug": "ai"},
-            {"claim_id": "fake-id", "topic_slug": "engineering"},  # hallucinated
-        ])
+        response = self._fake_model(
+            [
+                {"claim_id": "id-1", "topic_slug": "ai"},
+                {"claim_id": "fake-id", "topic_slug": "engineering"},  # hallucinated
+            ]
+        )
         with patch("lift_topics.call_model", return_value=response):
             result, route = assign_topics_with_model(self.BATCH, self.TOPICS)
         self.assertNotIn("fake-id", result)
-        self.assertIn("id-2", result)   # filled by heuristic
-        self.assertIn("id-3", result)   # filled by heuristic
+        self.assertIn("id-2", result)  # filled by heuristic
+        self.assertIn("id-3", result)  # filled by heuristic
         self.assertIn("partial-heuristic", route)
 
     def test_duplicate_assignments_keep_first(self) -> None:
         from lift_topics import assign_topics_with_model
-        response = self._fake_model([
-            {"claim_id": "id-1", "topic_slug": "ai"},
-            {"claim_id": "id-1", "topic_slug": "engineering"},  # duplicate
-            {"claim_id": "id-2", "topic_slug": "engineering"},
-            {"claim_id": "id-3", "topic_slug": "business"},
-        ])
+
+        response = self._fake_model(
+            [
+                {"claim_id": "id-1", "topic_slug": "ai"},
+                {"claim_id": "id-1", "topic_slug": "engineering"},  # duplicate
+                {"claim_id": "id-2", "topic_slug": "engineering"},
+                {"claim_id": "id-3", "topic_slug": "business"},
+            ]
+        )
         with patch("lift_topics.call_model", return_value=response):
             result, route = assign_topics_with_model(self.BATCH, self.TOPICS)
         self.assertEqual(result["id-1"], "ai")  # first assignment kept

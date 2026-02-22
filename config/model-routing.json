@@ -17,7 +17,8 @@
   },
   "evidence_synthesis": {
     "primary": "gemini:gemini-2.0-flash",
-    "fallback": "ollama:llama3.2:latest"
+    "fallback": "gemini-cli:gemini-2.5-flash-lite",
+    "fallbacks": ["ollama:llama3.2:latest"]
   },
   "enrichment": {
     "primary": "ollama:llama3.2:latest",
@@ -25,7 +26,8 @@
   },
   "editorial": {
     "primary": "gemini:gemini-2.0-flash",
-    "fallback": "opencode:claude-opus-4-6"
+    "fallback": "gemini-cli:gemini-2.5-flash-lite",
+    "fallbacks": ["ollama:llama3.2:latest"]
   },
   "ranker": {
     "primary": "deterministic-code",

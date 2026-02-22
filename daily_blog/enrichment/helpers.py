@@ -5,20 +5,35 @@ import urllib.parse
 def credibility_for_domain(domain: str, url: str = "") -> str:
     high = {
         # Academic & standards
-        "nature.com", "science.org", "nejm.org", "acm.org", "ieee.org",
+        "nature.com",
+        "science.org",
+        "nejm.org",
+        "acm.org",
+        "ieee.org",
         # Pre-print & primary research
         "arxiv.org",
         # Tech primary sources
-        "research.google", "ai.meta.com", "openai.com", "anthropic.com",
+        "research.google",
+        "ai.meta.com",
+        "openai.com",
+        "anthropic.com",
         "huggingface.co",
         # Tech journalism (primary reporting)
-        "techcrunch.com", "arstechnica.com", "wired.com", "thenextweb.com",
+        "techcrunch.com",
+        "arstechnica.com",
+        "wired.com",
+        "thenextweb.com",
         # Standards & documentation
-        "developer.mozilla.org", "docs.python.org", "nodejs.org",
+        "developer.mozilla.org",
+        "docs.python.org",
+        "nodejs.org",
         # Business primary sources
-        "wsj.com", "ft.com", "bloomberg.com",
+        "wsj.com",
+        "ft.com",
+        "bloomberg.com",
         # Open source governance
-        "github.blog", "about.gitlab.com",
+        "github.blog",
+        "about.gitlab.com",
     }
     medium = {
         "github.com",
@@ -31,9 +46,7 @@ def credibility_for_domain(domain: str, url: str = "") -> str:
     if domain.endswith(".edu") or domain.endswith(".gov"):
         return "high"
     # URL-path upgrade: primary research or documentation paths on any domain
-    if url and any(
-        seg in url for seg in ("/papers/", "/research/", "/publications/", "/docs/")
-    ):
+    if url and any(seg in url for seg in ("/papers/", "/research/", "/publications/", "/docs/")):
         return "high"
     if domain in medium:
         return "medium"
