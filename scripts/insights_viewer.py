@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import argparse
 import hashlib
-import importlib
 import json
 import os
 import re
@@ -21,10 +20,11 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
-_settings_utils = importlib.import_module("daily_blog.insights.settings_utils")
-coerce_field_value = _settings_utils.coerce_field_value
-get_path_value = _settings_utils.get_path_value
-set_path_value = _settings_utils.set_path_value
+from daily_blog.insights.settings_utils import (  # noqa: E402
+    coerce_field_value,
+    get_path_value,
+    set_path_value,
+)
 
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_DB = ROOT / "data" / "daily-blog.db"
@@ -64,7 +64,6 @@ def query_db(sqlite_path: Path, query: str, params: tuple = ()) -> list[dict]:
     if not sqlite_path.exists():
         return []
     conn = sqlite3.connect(sqlite_path)
-    conn.row_factory = sqlite3.Row
     try:
         cur = conn.execute(query, params)
         return dict_rows(cur)
@@ -1948,6 +1947,9 @@ def reddit_post_metrics(entry_id: str) -> dict:
         return _REDDIT_CACHE[entry_id]
 
     post_id = entry_id[3:]
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,20}", post_id):
+        _REDDIT_CACHE[entry_id] = {}
+        return {}
     url = f"https://www.reddit.com/comments/{post_id}.json?limit=1"
     req = urllib.request.Request(
         url,

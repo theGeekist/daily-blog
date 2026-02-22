@@ -3,7 +3,7 @@
 
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.8.0
+    rev: v0.15.2
     hooks:
       - id: ruff
         args: [--fix, --exit-non-zero-on-fix]
@@ -14,13 +14,13 @@ repos:
       - id: basedpyright-local
         name: basedpyright (.venv)
         entry: >-
-          bash -lc "test -x .venv/bin/basedpyright || { echo 'Missing .venv or basedpyright. Run make setup'; exit 1; }; .venv/bin/basedpyright"
+          bash -c "test -x .venv/bin/basedpyright || { echo 'Missing .venv or basedpyright. Run make setup'; exit 1; }; .venv/bin/basedpyright"
         language: system
         pass_filenames: false
       - id: unittest-fast-suite
         name: unittest fast suite (.venv)
         entry: >-
-          bash -lc "test -x .venv/bin/python || { echo 'Missing .venv. Run make setup'; exit 1; }; .venv/bin/python tests/run_suites.py precommit"
+          bash -c "test -x .venv/bin/python || { echo 'Missing .venv. Run make setup'; exit 1; }; .venv/bin/python tests/run_suites.py precommit"
         language: system
         pass_filenames: false
 

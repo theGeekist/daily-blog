@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS topic_clusters (
 CREATE TABLE IF NOT EXISTS claim_topic_map (
     claim_id TEXT NOT NULL,
     topic_id TEXT NOT NULL,
+    model_route_used TEXT,
     created_at TEXT NOT NULL,
     PRIMARY KEY (claim_id, topic_id)
 );
@@ -46,8 +47,15 @@ CREATE TABLE IF NOT EXISTS editorial_candidates (
     topic_id TEXT PRIMARY KEY,
     title_options_json TEXT NOT NULL,
     outline_markdown TEXT NOT NULL,
+    narrative_draft_markdown TEXT NOT NULL DEFAULT '',
     talking_points_json TEXT NOT NULL,
     verification_checklist_json TEXT NOT NULL,
+    evidence_brief_json TEXT NOT NULL DEFAULT '{}',
+    angle TEXT NOT NULL DEFAULT '',
+    audience TEXT NOT NULL DEFAULT '',
+    evidence_status TEXT NOT NULL DEFAULT 'WARN',
+    evidence_reasons_json TEXT NOT NULL DEFAULT '[]',
+    evidence_ui_state TEXT NOT NULL DEFAULT '',
     model_route_used TEXT NOT NULL,
     created_at TEXT NOT NULL
 );

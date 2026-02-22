@@ -157,7 +157,7 @@ def static_editorial_package(label: str, why: str, strategy: str = "explainer") 
         "verification_checklist": [
             "Every key claim has at least one fetched citation",
             "Title is non-duplicative against recent runs",
-            "Outline includes hook, thesis, sections, counterpoints, conclusion",
+            "Outline includes at least 4 distinct H2 sections with clear decision flow",
         ],
         "angle": "Pragmatic execution guide for teams making real publishing decisions.",
         "audience": (

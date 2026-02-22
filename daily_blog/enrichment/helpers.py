@@ -45,9 +45,15 @@ def credibility_for_domain(domain: str, url: str = "") -> str:
         return "high"
     if domain.endswith(".edu") or domain.endswith(".gov"):
         return "high"
-    # URL-path upgrade: primary research or documentation paths on any domain
-    if url and any(seg in url for seg in ("/papers/", "/research/", "/publications/", "/docs/")):
-        return "high"
+    # URL-path upgrade: allow documentation/research path hints only on trusted domain classes.
+    if url:
+        path = urllib.parse.urlparse(url).path.lower()
+        path_has_research_hint = any(
+            seg in path for seg in ("/papers/", "/research/", "/publications/", "/docs/")
+        )
+        trusted_for_upgrade = domain in high or domain.endswith((".edu", ".gov", ".org"))
+        if path_has_research_hint and trusted_for_upgrade:
+            return "high"
     if domain in medium:
         return "medium"
     if domain.endswith(".org"):
@@ -125,13 +131,7 @@ def filter_sources_for_quality(
         if domain:
             per_domain_count[domain] = count + 1
 
-    domains = {
-        str(source.get("domain", "")).strip().lower() or domain_for_url(url)
-        for url, source in capped.items()
-        if (str(source.get("domain", "")).strip() or domain_for_url(url))
-    }
-
-    if len(domains) >= min_domain_diversity:
+    if len(per_domain_count) >= min_domain_diversity:
         return capped
 
     # Diversity not met; fall back to uncapped set so upstream can decide how to handle scarcity.

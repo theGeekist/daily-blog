@@ -67,7 +67,9 @@ class TestExtractClaims(unittest.TestCase):
         env = {
             **os.environ,
             "SQLITE_PATH": str(self.db),
-            "MODEL_ROUTING_CONFIG": str(Path.cwd() / "tests" / "model-routing-fast-fail.json"),
+            "MODEL_ROUTING_CONFIG": str(
+                Path(__file__).resolve().parent / "model-routing-fast-fail.json"
+            ),
             "GOOGLE_API_KEY": "",
         }
         proc = subprocess.run(

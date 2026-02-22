@@ -73,12 +73,13 @@ def main() -> int:
     max_topics = int(os.getenv("ENRICH_MAX_TOPICS", "0"))
     min_domain_diversity = int(os.getenv("ENRICH_MIN_DOMAIN_DIVERSITY", "3"))
     max_per_domain = int(os.getenv("ENRICH_MAX_PER_DOMAIN", "3"))
+    min_credible_count = int(os.getenv("ENRICH_MIN_CREDIBLE_COUNT", "3"))
     progress_every = max(1, int(os.getenv("ENRICH_PROGRESS_EVERY", "1")))
     processed_topics = 0
     total_topics = len(topic_rows) if max_topics <= 0 else min(len(topic_rows), max_topics)
     started_at = time.monotonic()
     print(f"[enrich_topics] Processing {total_topics} topics", flush=True)
-    for topic_idx, (topic_id, label, keywords_json) in enumerate(topic_rows, start=1):
+    for topic_id, label, keywords_json in topic_rows:
         if max_topics > 0 and processed_topics >= max_topics:
             break
         processed_topics += 1
@@ -184,7 +185,7 @@ def main() -> int:
 
         source_map = filter_sources_for_quality(
             source_map,
-            min_credible_count=3,
+            min_credible_count=min_credible_count,
             min_domain_diversity=min_domain_diversity,
             max_per_domain=max_per_domain,
         )

@@ -221,7 +221,12 @@ def assign_topics_with_model(
         if claim_id in assignments:
             continue  # keep first assignment, skip duplicates
         if topic_slug not in allowed_slugs:
-            raise ModelCallError(f"Unknown topic_slug in assignments: {topic_slug}")
+            logger.warning(
+                "Skipping unknown topic_slug from model assignment: claim_id=%s topic_slug=%s",
+                claim_id,
+                topic_slug,
+            )
+            continue
         assignments[claim_id] = topic_slug
 
     missing = [cid for cid in claim_ids if cid not in assignments]

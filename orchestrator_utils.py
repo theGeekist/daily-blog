@@ -4,6 +4,7 @@ import logging
 import os
 import re
 import subprocess
+import threading
 import time
 from json import JSONDecodeError
 from json.decoder import JSONDecoder
@@ -20,6 +21,9 @@ DEFAULT_GEMINI_MISSING_KEY_BACKPRESSURE_SECONDS = 1800
 logger = logging.getLogger(__name__)
 _MODEL_BACKPRESSURE_UNTIL: dict[str, float] = {}
 _MODEL_BACKPRESSURE_REASON: dict[str, str] = {}
+_MODEL_BACKPRESSURE_LOCK = threading.RLock()
+GEMINI_MISSING_KEY_PATTERNS = ("google_api_key is required",)
+GEMINI_QUOTA_PATTERNS = ("resource_exhausted", "quota exceeded", "429")
 
 
 class ModelCallError(RuntimeError):
@@ -112,6 +116,7 @@ def _invoke_with_retries(
             raw_output = _dispatch_model(model_name=model_name, prompt=prompt, schema=schema)
         except ModelCallError:
             # Hard provider/transport failures should not be retried.
+            # _dispatch_model is expected to raise ModelCallError for transport/provider issues.
             raise
         try:
             parsed_content = _extract_json_payload(raw_output)
@@ -341,12 +346,13 @@ def _dispatch_openclaw(model_name: str, prompt: str, schema: dict | None) -> str
 
 
 def _run_subprocess_model(cli_tool: str, cli_model: str, prompt: str) -> str:
-    command = [cli_tool, "run", "-m", cli_model, prompt]
+    command = [cli_tool, "run", "-m", cli_model]
     logger.info("Calling model via CLI", extra={"cli": cli_tool, "model": cli_model})
 
     try:
         completed = subprocess.run(
             command,
+            input=prompt,
             capture_output=True,
             text=True,
             timeout=DEFAULT_TIMEOUT_SECONDS,
@@ -502,17 +508,18 @@ def _assert_type(instance: Any, expected: str, path: str) -> None:
 
 
 def _model_backpressure_message(model_name: str) -> str:
-    until = _MODEL_BACKPRESSURE_UNTIL.get(model_name)
-    if until is None:
-        return ""
-    now = time.monotonic()
-    if now >= until:
-        _MODEL_BACKPRESSURE_UNTIL.pop(model_name, None)
-        _MODEL_BACKPRESSURE_REASON.pop(model_name, None)
-        return ""
-    remaining = max(1, int(until - now))
-    reason = _MODEL_BACKPRESSURE_REASON.get(model_name, "temporary provider backpressure")
-    return f"{reason}; retry in ~{remaining}s"
+    with _MODEL_BACKPRESSURE_LOCK:
+        until = _MODEL_BACKPRESSURE_UNTIL.get(model_name)
+        if until is None:
+            return ""
+        now = time.monotonic()
+        if now >= until:
+            _MODEL_BACKPRESSURE_UNTIL.pop(model_name, None)
+            _MODEL_BACKPRESSURE_REASON.pop(model_name, None)
+            return ""
+        remaining = max(1, int(until - now))
+        reason = _MODEL_BACKPRESSURE_REASON.get(model_name, "temporary provider backpressure")
+        return f"{reason}; retry in ~{remaining}s"
 
 
 def _maybe_apply_model_backpressure(model_name: str, error: str) -> None:
@@ -520,11 +527,13 @@ def _maybe_apply_model_backpressure(model_name: str, error: str) -> None:
     if provider != "gemini":
         return
 
+    # Pattern matching here is intentionally pragmatic because upstream provider errors are
+    # inconsistent across SDK/CLI call paths. Keep patterns centralized for maintenance.
     message = error.lower()
     cooldown_seconds = 0
     reason = ""
 
-    if "google_api_key is required" in message:
+    if any(pattern in message for pattern in GEMINI_MISSING_KEY_PATTERNS):
         cooldown_seconds = int(
             os.getenv(
                 "GEMINI_MISSING_KEY_BACKPRESSURE_SECONDS",
@@ -532,7 +541,7 @@ def _maybe_apply_model_backpressure(model_name: str, error: str) -> None:
             )
         )
         reason = "missing GOOGLE_API_KEY for gemini route"
-    elif "resource_exhausted" in message or "quota exceeded" in message or "429" in message:
+    elif any(pattern in message for pattern in GEMINI_QUOTA_PATTERNS):
         cooldown_seconds = int(
             os.getenv(
                 "GEMINI_QUOTA_BACKPRESSURE_SECONDS",
@@ -545,12 +554,12 @@ def _maybe_apply_model_backpressure(model_name: str, error: str) -> None:
         return
 
     until = time.monotonic() + cooldown_seconds
-    existing_until = _MODEL_BACKPRESSURE_UNTIL.get(model_name, 0.0)
-    if until <= existing_until:
-        return
-
-    _MODEL_BACKPRESSURE_UNTIL[model_name] = until
-    _MODEL_BACKPRESSURE_REASON[model_name] = reason
+    with _MODEL_BACKPRESSURE_LOCK:
+        existing_until = _MODEL_BACKPRESSURE_UNTIL.get(model_name, 0.0)
+        if until <= existing_until:
+            return
+        _MODEL_BACKPRESSURE_UNTIL[model_name] = until
+        _MODEL_BACKPRESSURE_REASON[model_name] = reason
     logger.warning(
         "Backpressure enabled for model '%s' for %ss (%s)",
         model_name,

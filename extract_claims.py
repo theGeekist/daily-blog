@@ -233,6 +233,15 @@ def upsert_claims(conn: sqlite3.Connection, rows: list[tuple]) -> int:
     return inserted
 
 
+def parse_int_env(name: str, default: int, minimum: int = 1) -> int:
+    raw = os.getenv(name, str(default))
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        value = default
+    return max(minimum, value)
+
+
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     load_env_file(Path(".env"))
@@ -243,8 +252,8 @@ def main() -> int:
 
     conn = sqlite3.connect(sqlite_path)
     init_claims_table(conn)
-    max_mentions = int(os.getenv("EXTRACT_MAX_MENTIONS", "300"))
-    progress_every = max(1, int(os.getenv("EXTRACT_PROGRESS_EVERY", "25")))
+    max_mentions = parse_int_env("EXTRACT_MAX_MENTIONS", 300, minimum=1)
+    progress_every = parse_int_env("EXTRACT_PROGRESS_EVERY", 25, minimum=1)
     mentions = read_mentions(conn, limit=max_mentions)
     now = now_iso()
     started_at = time.monotonic()
@@ -301,14 +310,14 @@ def main() -> int:
         )
         if idx % progress_every == 0 or idx == total_mentions:
             elapsed = max(0.001, time.monotonic() - started_at)
-            rate = idx / elapsed
+            rows_ready_rate = len(rows) / elapsed
             print(
                 "[extract_claims] "
                 f"progress={idx}/{total_mentions} "
                 f"rows_ready={len(rows)} "
                 f"fallbacks={fallback_count} "
                 f"skipped={skipped_quality_count} "
-                f"rate={rate:.1f}/s",
+                f"rows_ready_rate={rows_ready_rate:.1f}/s",
                 flush=True,
             )
 
