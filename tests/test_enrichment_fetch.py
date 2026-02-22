@@ -68,12 +68,31 @@ class TestCredibilityForDomain(unittest.TestCase):
     def test_unknown_domain_is_low(self) -> None:
         self.assertEqual(credibility_for_domain("randomsite.io"), "low")
 
-    def test_url_path_upgrades_to_high(self) -> None:
-        # A normally-low domain becomes high when URL path signals primary research
+    def test_url_path_upgrade_requires_trusted_domain(self) -> None:
+        # Strict mode: avoid false positive credibility inflation on arbitrary domains.
+        # Path hints only upgrade trusted domains (.edu/.gov/.org or explicit allowlist highs).
         for path in ("/papers/", "/research/", "/publications/", "/docs/"):
             url = f"https://somecompany.com{path}my-paper"
             with self.subTest(path=path):
-                self.assertEqual(credibility_for_domain("somecompany.com", url), "high")
+                self.assertEqual(credibility_for_domain("somecompany.com", url), "low")
+
+    def test_url_path_upgrade_for_trusted_tlds(self) -> None:
+        for domain in ("mit.edu", "nist.gov", "example.org"):
+            for path in ("/papers/", "/research/", "/publications/", "/docs/"):
+                url = f"https://{domain}{path}resource"
+                with self.subTest(domain=domain, path=path):
+                    self.assertEqual(credibility_for_domain(domain, url), "high")
+
+    def test_url_path_upgrade_for_allowlisted_high_domain(self) -> None:
+        domain = "anthropic.com"
+        for path in ("/papers/", "/research/", "/publications/", "/docs/"):
+            url = f"https://{domain}{path}note"
+            with self.subTest(path=path):
+                self.assertEqual(credibility_for_domain(domain, url), "high")
+
+    def test_url_path_upgrade_uses_path_not_query(self) -> None:
+        url = "https://randomsite.com/?next=/docs/paper"
+        self.assertEqual(credibility_for_domain("randomsite.com", url), "low")
 
     def test_url_path_upgrade_does_not_downgrade_existing_high(self) -> None:
         # High domains stay high regardless
