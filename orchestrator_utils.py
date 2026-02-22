@@ -34,6 +34,14 @@ class ModelOutputValidationError(ModelCallError):
     pass
 
 
+def _safe_env_int(name: str, default: int) -> int:
+    raw = os.getenv(name, str(default))
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return default
+
+
 def call_model(stage_name: str, prompt: str, schema: dict | None = None) -> dict[str, Any]:
     routing_path = Path(os.getenv("MODEL_ROUTING_CONFIG", str(DEFAULT_MODEL_ROUTING_PATH)))
     prompts_path = Path(os.getenv("PROMPTS_CONFIG", str(DEFAULT_PROMPTS_PATH)))
@@ -171,6 +179,7 @@ def _parse_model_ref(model_name: str) -> tuple[str, str]:
 
 def _dispatch_ollama(model_name: str, prompt: str, schema: dict | None) -> str:
     try:
+        import ollama
         from ollama import chat
     except ImportError as exc:
         raise ModelCallError(
@@ -186,6 +195,18 @@ def _dispatch_ollama(model_name: str, prompt: str, schema: dict | None) -> str:
         "messages": [{"role": "user", "content": prompt}],
     }
     if schema:
+        version_str = str(getattr(ollama, "__version__", "0.0.0"))
+        try:
+            major, minor, patch = (
+                int(part) for part in (version_str.split(".") + ["0", "0"])[:3]
+            )
+        except ValueError:
+            major, minor, patch = (0, 0, 0)
+        if (major, minor, patch) < (0, 4, 3):
+            raise ModelCallError(
+                "Ollama schema format requires ollama>=0.4.3; "
+                f"installed version is {version_str}"
+            )
         kwargs["format"] = schema
 
     try:
@@ -274,8 +295,6 @@ def _dispatch_gemini_cli(model_name: str, prompt: str, schema: dict | None) -> s
         "gemini",
         "--model",
         model_id,
-        "--prompt",
-        prompt,
         "--output-format",
         "text",
     ]
@@ -284,6 +303,7 @@ def _dispatch_gemini_cli(model_name: str, prompt: str, schema: dict | None) -> s
     try:
         completed = subprocess.run(
             command,
+            input=prompt,
             capture_output=True,
             text=True,
             timeout=DEFAULT_TIMEOUT_SECONDS,
@@ -378,7 +398,7 @@ def _run_subprocess_model(cli_tool: str, cli_model: str, prompt: str) -> str:
     if not combined:
         raise ModelCallError(f"CLI returned empty output for model '{cli_model}'")
 
-    return combined
+    return output
 
 
 def _load_model_routing(config_path: Path) -> dict[str, Any]:
@@ -534,19 +554,15 @@ def _maybe_apply_model_backpressure(model_name: str, error: str) -> None:
     reason = ""
 
     if any(pattern in message for pattern in GEMINI_MISSING_KEY_PATTERNS):
-        cooldown_seconds = int(
-            os.getenv(
-                "GEMINI_MISSING_KEY_BACKPRESSURE_SECONDS",
-                str(DEFAULT_GEMINI_MISSING_KEY_BACKPRESSURE_SECONDS),
-            )
+        cooldown_seconds = _safe_env_int(
+            "GEMINI_MISSING_KEY_BACKPRESSURE_SECONDS",
+            DEFAULT_GEMINI_MISSING_KEY_BACKPRESSURE_SECONDS,
         )
         reason = "missing GOOGLE_API_KEY for gemini route"
     elif any(pattern in message for pattern in GEMINI_QUOTA_PATTERNS):
-        cooldown_seconds = int(
-            os.getenv(
-                "GEMINI_QUOTA_BACKPRESSURE_SECONDS",
-                str(DEFAULT_GEMINI_QUOTA_BACKPRESSURE_SECONDS),
-            )
+        cooldown_seconds = _safe_env_int(
+            "GEMINI_QUOTA_BACKPRESSURE_SECONDS",
+            DEFAULT_GEMINI_QUOTA_BACKPRESSURE_SECONDS,
         )
         reason = "gemini quota/rate-limit backpressure"
 

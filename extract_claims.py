@@ -237,9 +237,9 @@ def parse_int_env(name: str, default: int, minimum: int = 1) -> int:
     raw = os.getenv(name, str(default))
     try:
         value = int(raw)
-    except (TypeError, ValueError):
+    except ValueError:
         value = default
-    return max(minimum, value)
+    return max(1 if minimum < 1 else minimum, value)
 
 
 def main() -> int:

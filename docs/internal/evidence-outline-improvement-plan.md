@@ -183,7 +183,7 @@ def credibility_for_domain(domain: str, url: str = "") -> str:
 **Acceptance criteria:**
 - [x] `credibility_for_domain()` recognises tech/journalism sources as `high`
 - [x] `arxiv.org` moved from `medium` to `high`
-- [x] URL-path upgrade (`/papers/`, `/research/`, `/publications/`, `/docs/`) promotes any domain to `high`
+- [x] URL-path upgrade (`/papers/`, `/research/`, `/publications/`, `/docs/`) promotes trusted domains (`.edu`, `.gov`, `.org`, or allowlisted `high`) to `high`
 - [x] `warn_min_avg_credibility_score` lowered from 3.0 to 2.5 in `rules-engine.json`
 - [x] All callers in `enrich_topics.py` and `model_io.py` pass URL to `credibility_for_domain()`
 - [x] 10 unit tests covering new domains, URL-path logic, and legacy behavior added to `test_enrichment_fetch`

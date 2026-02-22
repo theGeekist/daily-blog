@@ -17,12 +17,14 @@ repos:
           bash -c "test -x .venv/bin/basedpyright || { echo 'Missing .venv or basedpyright. Run make setup'; exit 1; }; .venv/bin/basedpyright"
         language: system
         pass_filenames: false
+        always_run: true
       - id: unittest-fast-suite
         name: unittest fast suite (.venv)
         entry: >-
           bash -c "test -x .venv/bin/python || { echo 'Missing .venv. Run make setup'; exit 1; }; .venv/bin/python tests/run_suites.py precommit"
         language: system
         pass_filenames: false
+        always_run: true
 
 # Exclude common generated and cache directories
 exclude: |
