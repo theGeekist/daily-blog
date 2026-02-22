@@ -1,6 +1,7 @@
 import os
 import sqlite3
 import subprocess
+import sys
 import tempfile
 import time
 import unittest
@@ -27,7 +28,6 @@ class TestE2EDeterministic(unittest.TestCase):
             "TOP_OUTLINES_PATH": str(self.root / "top_outlines.md"),
             "RESEARCH_PACK_PATH": str(self.root / "research_pack.json"),
             "MODEL_ROUTING_CONFIG": str(Path.cwd() / "tests" / "model-routing-fast-fail.json"),
-            "PATH": "/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin",
             "ENRICH_SKIP_MODEL": "1",
             "ENRICH_SEARCH_BACKEND": "searxng",
             "SEARXNG_BASE_URL": "http://127.0.0.1:1",
@@ -35,7 +35,7 @@ class TestE2EDeterministic(unittest.TestCase):
             "GOOGLE_API_KEY": "",
         }
         proc = subprocess.run(
-            ["python3", script_name],
+            [sys.executable, script_name],
             env=env,
             capture_output=True,
             text=True,
