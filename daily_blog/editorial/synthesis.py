@@ -1,7 +1,7 @@
 import json
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from orchestrator_utils import ModelCallError, call_model
 
@@ -12,7 +12,7 @@ class EvidenceBrief(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     topic_id: str
-    claim_count: int
+    claim_count: int = Field(ge=0)
     top_claims: list[str]
     problem_pressures: list[str]
     proposed_solutions: list[str]
@@ -44,16 +44,18 @@ def synthesize_evidence_brief(
         fallback_brief=fallback,
     )
 
+    model_used = "model-unknown"
     try:
         result = call_model(EVIDENCE_SYNTHESIS_STAGE, prompt, schema=EVIDENCE_BRIEF_SCHEMA)
+        model_used = str(result.get("model_used", "model-unknown"))
         payload = result.get("content", {})
         if isinstance(payload, dict):
             merged = dict(fallback)
             merged.update(payload)
             merged["topic_id"] = topic_id
-            return _finalize_brief(merged), str(result.get("model_used", EVIDENCE_SYNTHESIS_STAGE))
-    except ModelCallError:
-        pass
+            return _finalize_brief(merged), model_used
+    except (ModelCallError, ValidationError):
+        return fallback, model_used if model_used != "model-unknown" else "deterministic-synthesis"
 
     return fallback, "deterministic-synthesis"
 
@@ -202,15 +204,15 @@ def _infer_pattern(
     stance_breakdown: dict[str, int],
 ) -> str:
     if claim_count > 0:
-        data_ratio = int(evidence_type_counts.get("data", 0)) / claim_count
-        anecdote_ratio = int(evidence_type_counts.get("anecdote", 0)) / claim_count
+        data_ratio = evidence_type_counts.get("data", 0) / claim_count
+        anecdote_ratio = evidence_type_counts.get("anecdote", 0) / claim_count
         if data_ratio > 0.5:
             return "data-backed"
         if anecdote_ratio > 0.7:
             return "anecdotal"
 
     if source_count > 0:
-        contradict_ratio = int(stance_breakdown.get("contradicts", 0)) / source_count
+        contradict_ratio = stance_breakdown.get("contradicts", 0) / source_count
         if contradict_ratio > 0.2:
             return "contested"
 

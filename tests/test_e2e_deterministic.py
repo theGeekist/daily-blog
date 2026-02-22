@@ -30,7 +30,9 @@ class TestE2EDeterministic(unittest.TestCase):
             "DAILY_BOARD_PATH": str(self.root / "daily_board.md"),
             "TOP_OUTLINES_PATH": str(self.root / "top_outlines.md"),
             "RESEARCH_PACK_PATH": str(self.root / "research_pack.json"),
-            "MODEL_ROUTING_CONFIG": str(Path.cwd() / "tests" / "model-routing-fast-fail.json"),
+            "MODEL_ROUTING_CONFIG": str(
+                Path(__file__).resolve().parent / "model-routing-fast-fail.json"
+            ),
             "ENRICH_SKIP_MODEL": "1",
             "ENRICH_SEARCH_BACKEND": "searxng",
             "SEARXNG_BASE_URL": "http://127.0.0.1:1",
