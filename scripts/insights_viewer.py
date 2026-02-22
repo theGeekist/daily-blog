@@ -1486,6 +1486,26 @@ def ensure_prometheus_tables(sqlite_path: Path) -> None:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS candidate_dossiers (
+                run_id TEXT NOT NULL,
+                entry_id TEXT NOT NULL,
+                schema_version TEXT NOT NULL DEFAULT '2.0.0',
+                raw_capture_json TEXT NOT NULL DEFAULT '{}',
+                normalized_candidate_json TEXT NOT NULL DEFAULT '{}',
+                editorial_decision_json TEXT NOT NULL DEFAULT '{}',
+                discovery_score_json TEXT NOT NULL DEFAULT '{}',
+                publishability_score_json TEXT NOT NULL DEFAULT '{}',
+                recommendation TEXT NOT NULL DEFAULT 'investigate',
+                reason_codes_json TEXT NOT NULL DEFAULT '[]',
+                topic_confidence REAL NOT NULL DEFAULT 0.0,
+                classifier_trace_json TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL,
+                PRIMARY KEY (run_id, entry_id)
+            )
+            """
+        )
         conn.commit()
     except sqlite3.Error:
         pass
@@ -1929,6 +1949,42 @@ def candidate_detail_payload(sqlite_path: Path, run_id: str, entry_id: str) -> d
         )
 
     social = reddit_post_metrics(entry_id)
+    dossier_rows = query_db(
+        sqlite_path,
+        """
+        SELECT schema_version, raw_capture_json, normalized_candidate_json,
+               editorial_decision_json, discovery_score_json, publishability_score_json,
+               recommendation, reason_codes_json, topic_confidence,
+               classifier_trace_json, created_at
+        FROM candidate_dossiers
+        WHERE run_id = ? AND entry_id = ?
+        LIMIT 1
+        """,
+        (run_id, entry_id),
+    )
+    dossier: dict = {}
+    if dossier_rows:
+        row = dossier_rows[0]
+        try:
+            dossier = {
+                "schema_version": str(row.get("schema_version") or "2.0.0"),
+                "raw_capture": json.loads(str(row.get("raw_capture_json") or "{}")),
+                "normalized_candidate": json.loads(
+                    str(row.get("normalized_candidate_json") or "{}")
+                ),
+                "editorial_decision": json.loads(str(row.get("editorial_decision_json") or "{}")),
+                "scoring": {
+                    "discovery": json.loads(str(row.get("discovery_score_json") or "{}")),
+                    "publishability": json.loads(str(row.get("publishability_score_json") or "{}")),
+                },
+                "recommendation": str(row.get("recommendation") or "investigate"),
+                "reason_codes": json.loads(str(row.get("reason_codes_json") or "[]")),
+                "topic_confidence": float(row.get("topic_confidence") or 0.0),
+                "classifier_trace": json.loads(str(row.get("classifier_trace_json") or "{}")),
+                "created_at": str(row.get("created_at") or ""),
+            }
+        except (json.JSONDecodeError, TypeError, ValueError):
+            dossier = {}
 
     return {
         "candidate": candidate,
@@ -1937,6 +1993,7 @@ def candidate_detail_payload(sqlite_path: Path, run_id: str, entry_id: str) -> d
         "sources": sources,
         "editorial": editorial,
         "social": social,
+        "dossier": dossier,
     }
 
 

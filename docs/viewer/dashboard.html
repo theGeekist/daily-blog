@@ -1319,6 +1319,69 @@
       }
 
       function buildCandidateDiscussionMarkdown(bundle) {
+        const dossier = bundle.dossier && typeof bundle.dossier === "object" ? bundle.dossier : null;
+        if (dossier && Object.keys(dossier).length > 0) {
+          const c = bundle.candidate || {};
+          const topic = bundle.topic || {};
+          const editorialDecision = dossier.editorial_decision || {};
+          const normalized = dossier.normalized_candidate || {};
+          const extraction = normalized.extraction || {};
+          const classification = normalized.classification || {};
+          const scoring = dossier.scoring || {};
+          const discovery = scoring.discovery || {};
+          const publishability = scoring.publishability || {};
+          const reasonCodes = Array.isArray(dossier.reason_codes) ? dossier.reason_codes : [];
+          const verification = Array.isArray(editorialDecision.verification_plan)
+            ? editorialDecision.verification_plan
+            : [];
+          const angles = Array.isArray(editorialDecision.angles) ? editorialDecision.angles : [];
+          const outlineSeed = editorialDecision.outline_seed || {};
+          return [
+            `# Candidate Dossier: ${c.title || "(untitled candidate)"}`,
+            "",
+            "## Snapshot",
+            `- Recommendation: **${dossier.recommendation || "investigate"}**`,
+            `- Topic: ${classification.topic_primary || topic.parent_topic_slug || c.topic || "unknown"}`,
+            `- Topic confidence: ${Number(dossier.topic_confidence || 0).toFixed(2)}`,
+            `- Evidence state: ${publishability.state || "not_evaluated"}`,
+            `- Why this matters: ${editorialDecision.why_interesting || "No summary available."}`,
+            "",
+            "## Candidate Understanding",
+            `- Candidate type: ${extraction.candidate_type || "unknown"}`,
+            `- Post intent: ${Array.isArray(extraction.post_intent) ? extraction.post_intent.join(", ") : "unknown"}`,
+            `- Core problem: ${extraction.core_problem || "Not extracted"}`,
+            `- Solution pattern: ${extraction.solution_pattern || "Not extracted"}`,
+            "",
+            "## Editorial Potential",
+            ...(angles.length
+              ? angles.map((a) => `- ${a.title || "Untitled angle"} (${a.fit_score ?? "n/a"})`)
+              : ["- No candidate-specific angles generated."]),
+            "",
+            "## Verification and Risks",
+            ...(verification.length ? verification.map((v) => `- ${v}`) : ["- No verification plan available."]),
+            ...(reasonCodes.length ? reasonCodes.map((r) => `- Reason code: ${r}`) : ["- Reason code: none"]),
+            "",
+            "## Scoring",
+            `- Discovery total: ${typeof discovery.total === "number" ? discovery.total.toFixed(3) : "n/a"}`,
+            `- Publishability total: ${
+              typeof publishability.total === "number" ? publishability.total.toFixed(3) : "not evaluated"
+            }`,
+            "",
+            "## Draft Seed",
+            `- Hook: ${outlineSeed.hook || ""}`,
+            `- Thesis: ${outlineSeed.thesis || ""}`,
+            ...(Array.isArray(outlineSeed.sections) && outlineSeed.sections.length
+              ? outlineSeed.sections.map((s) => `- ${s}`)
+              : ["- No grounded sections available."]),
+            "",
+            "## Provenance",
+            `- URL: ${c.url || ""}`,
+            `- Published: ${formatIso(c.published)}`,
+            `- Source: ${c.source || ""}`,
+            "",
+          ].join("\n");
+        }
+
         const c = bundle.candidate || {};
         const topic = bundle.topic || {};
         const claim = bundle.claim || {};
@@ -1621,6 +1684,7 @@
           claim,
           claims: detail.claims || [],
           editorial,
+          dossier: detail.dossier || {},
           social,
           metadata,
           contextLinks,

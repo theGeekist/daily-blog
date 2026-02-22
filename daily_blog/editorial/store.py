@@ -55,3 +55,27 @@ def init_editorial_table(conn: sqlite3.Connection) -> None:
             "evidence_brief_json TEXT NOT NULL DEFAULT '{}'"
         )
     conn.commit()
+
+
+def init_candidate_dossiers_table(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS candidate_dossiers (
+            run_id TEXT NOT NULL,
+            entry_id TEXT NOT NULL,
+            schema_version TEXT NOT NULL DEFAULT '2.0.0',
+            raw_capture_json TEXT NOT NULL DEFAULT '{}',
+            normalized_candidate_json TEXT NOT NULL DEFAULT '{}',
+            editorial_decision_json TEXT NOT NULL DEFAULT '{}',
+            discovery_score_json TEXT NOT NULL DEFAULT '{}',
+            publishability_score_json TEXT NOT NULL DEFAULT '{}',
+            recommendation TEXT NOT NULL DEFAULT 'investigate',
+            reason_codes_json TEXT NOT NULL DEFAULT '[]',
+            topic_confidence REAL NOT NULL DEFAULT 0.0,
+            classifier_trace_json TEXT NOT NULL DEFAULT '{}',
+            created_at TEXT NOT NULL,
+            PRIMARY KEY (run_id, entry_id)
+        )
+        """
+    )
+    conn.commit()

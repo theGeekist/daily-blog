@@ -28,7 +28,7 @@ def compute_evidence_assessment(
     total_sources = len(source_rows)
     fetched_rows = [row for row in source_rows if int(row[2] or 0) == 1]
     fetched_count = len(fetched_rows)
-    fetched_ratio = (fetched_count / total_sources) if total_sources else 0.0
+    fetched_ratio = (fetched_count / total_sources) if total_sources else None
     avg_cred = (
         sum(credibility_score(str(row[3] or "")) for row in fetched_rows) / fetched_count
         if fetched_count
@@ -43,9 +43,12 @@ def compute_evidence_assessment(
     if total_sources < min_sources:
         status = "BLOCK"
         reasons.append(f"source_count={total_sources} below minimum {min_sources}")
-    if fetched_ratio < min_fetched_ratio:
+    effective_fetched_ratio = fetched_ratio if fetched_ratio is not None else 0.0
+    if effective_fetched_ratio < min_fetched_ratio:
         status = "BLOCK"
-        reasons.append(f"fetched_ratio={fetched_ratio:.2f} below minimum {min_fetched_ratio:.2f}")
+        reasons.append(
+            f"fetched_ratio={effective_fetched_ratio:.2f} below minimum {min_fetched_ratio:.2f}"
+        )
     if avg_cred < min_avg_cred:
         status = "BLOCK"
         reasons.append(f"avg_credibility={avg_cred:.2f} below minimum {min_avg_cred:.2f}")
@@ -54,10 +57,11 @@ def compute_evidence_assessment(
         reasons.append("only anecdotal claims with insufficient source count")
 
     if status != "BLOCK":
-        if fetched_ratio < warn_min_fetched_ratio:
+        if effective_fetched_ratio < warn_min_fetched_ratio:
             status = "WARN"
             reasons.append(
-                f"fetched_ratio={fetched_ratio:.2f} below recommended {warn_min_fetched_ratio:.2f}"
+                "fetched_ratio="
+                f"{effective_fetched_ratio:.2f} below recommended {warn_min_fetched_ratio:.2f}"
             )
         if avg_cred < warn_min_avg_cred:
             status = "WARN"
@@ -84,9 +88,12 @@ def compute_evidence_assessment(
         "metrics": {
             "source_count": total_sources,
             "fetched_count": fetched_count,
-            "fetched_ratio": round(fetched_ratio, 4),
-            "avg_credibility": round(avg_cred, 4),
-            "domain_diversity": domain_diversity,
+            "fetched_ratio": (
+                round(effective_fetched_ratio, 4) if fetched_ratio is not None else None
+            ),
+            "avg_credibility": round(avg_cred, 4) if fetched_count else None,
+            "domain_diversity": domain_diversity if fetched_count else None,
             "evidence_types": sorted(evidence_types),
+            "publishability_state": "not_evaluated" if fetched_count == 0 else "evaluated",
         },
     }
