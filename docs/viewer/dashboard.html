@@ -1323,7 +1323,8 @@
         if (dossier && Object.keys(dossier).length > 0) {
           const c = bundle.candidate || {};
           const topic = bundle.topic || {};
-          const editorialDecision = dossier.editorial_decision || {};
+          const editorialDecision =
+            dossier.editorial_decision || dossier.editorial_decision_dossier || {};
           const normalized = dossier.normalized_candidate || {};
           const extraction = normalized.extraction || {};
           const classification = normalized.classification || {};

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import json
 import os
+import re
 import sqlite3
 import sys
 from pathlib import Path
@@ -55,10 +56,11 @@ def _recommendation_for(
 
 def _build_dossier_markdown(dossier: dict) -> str:
     source = dossier.get("source", {})
-    extraction = dossier.get("extraction", {})
+    normalized = dossier.get("normalized_candidate", {})
+    extraction = dossier.get("extraction", {}) or normalized.get("extraction", {})
     scoring = dossier.get("scoring", {})
     evidence = dossier.get("evidence", {})
-    editorial = dossier.get("editorial", {})
+    editorial = dossier.get("editorial", {}) or dossier.get("editorial_decision_dossier", {})
     provenance = dossier.get("raw_capture", {})
 
     def _list(items: list[str], fallback: str) -> str:
@@ -67,7 +69,7 @@ def _build_dossier_markdown(dossier: dict) -> str:
             return f"- {fallback}"
         return "\n".join(f"- {item}" for item in rows)
 
-    classification = dossier.get("classification", {})
+    classification = dossier.get("classification", {}) or normalized.get("classification", {})
     vertical_fit = classification.get("vertical_fit", {})
     angles = [a.get("title", "") for a in editorial.get("angles", [])]
 
@@ -336,6 +338,84 @@ def main() -> int:
         narrative_draft = package["narrative_draft_markdown"]
         angle = package["angle"]
         audience = package["audience"]
+        fetched_count = int(assessment.get("metrics", {}).get("fetched_count", 0) or 0)
+        source_count = int(assessment.get("metrics", {}).get("source_count", 0) or 0)
+        fetched_ratio = assessment.get("metrics", {}).get("fetched_ratio")
+        domain_diversity = assessment.get("metrics", {}).get("domain_diversity")
+        threshold = float(os.getenv("TOPIC_CONFIDENCE_THRESHOLD", "0.3"))
+        reason_codes: list[str] = []
+        if evidence_status == "BLOCK":
+            reason_codes.append("EVIDENCE_BLOCK")
+        elif evidence_status == "WARN":
+            reason_codes.append("EVIDENCE_WARN")
+        if topic_confidence < threshold:
+            reason_codes.append("TOPIC_UNCERTAIN")
+        if fetched_count == 0:
+            reason_codes.append("NO_FETCHED_SOURCES")
+        if not reason_codes:
+            reason_codes.append("NONE")
+
+        summary_text = str(candidate_row[11] if candidate_row else "").lower()
+        candidate_type = "practitioner_help_request" if "help" in summary_text else "news_event"
+        post_intent = (
+            "request_feedback"
+            if "feedback" in summary_text
+            else ("ask" if "?" in summary_text else "discuss")
+        )
+        artifact_types: list[str] = []
+        if "```" in summary_text:
+            artifact_types.append("code")
+        if re.search(r"https?://", summary_text):
+            artifact_types.append("link")
+        if re.search(r"\.(png|jpe?g|gif|webp)\b", summary_text):
+            artifact_types.append("image")
+        screenshot_required = 1 if "image" in artifact_types else 0
+        code_required = 1 if "code" in artifact_types else 0
+        fw_text = " ".join(
+            [str(c.get("headline", "")) for c in claims]
+            + [str(c.get("problem_pressure", "")) for c in claims]
+            + [str(c.get("proposed_solution", "")) for c in claims]
+        ).lower()
+        framework_hits = re.search(
+            r"\b(wordpress|react|next\.js|nextjs|django|flask|rails|vue|angular|gutenberg)\b",
+            fw_text,
+        )
+        framework_agnostic_potential = 0 if framework_hits else 1
+        reader_pain_signal = next(
+            (
+                str(c.get("problem_pressure", "")).strip()
+                for c in claims
+                if c.get("problem_pressure")
+            ),
+            "",
+        )
+        div_score = float(domain_diversity or 0) if domain_diversity is not None else 0.0
+        fetch_score = float(fetched_ratio or 0) if fetched_ratio is not None else 0.0
+        transformability_score = round(
+            max(0.0, min(1.0, ((len(claims) / 10.0) + (div_score / 5.0) + fetch_score) / 3.0)),
+            4,
+        )
+        angle_fit_scores = [
+            {"angle": str(t), "score": 0.75}
+            for t in title_options[:3]
+            if str(t).strip()
+        ]
+        if evidence_status == "BLOCK":
+            draftability_now = "no"
+        elif evidence_status == "WARN":
+            draftability_now = "needs-evidence"
+        elif topic_confidence >= 0.5:
+            draftability_now = "yes"
+        else:
+            draftability_now = "needs-evidence"
+        if fetched_ratio is None:
+            verification_cost = "high"
+        elif float(fetched_ratio) >= 0.7:
+            verification_cost = "low"
+        elif float(fetched_ratio) >= 0.4:
+            verification_cost = "medium"
+        else:
+            verification_cost = "high"
 
         conn.execute(
             """
@@ -343,8 +423,14 @@ def main() -> int:
                 topic_id, title_options_json, outline_markdown, narrative_draft_markdown,
                 talking_points_json, verification_checklist_json,
                 evidence_brief_json, angle, audience, evidence_status, evidence_reasons_json,
-                evidence_ui_state, model_route_used, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                evidence_ui_state, candidate_type, post_intent, artifact_types_present,
+                screenshot_required, code_required, transformability_score,
+                framework_agnostic_potential, reader_pain_signal, angle_fit_scores,
+                verification_cost, draftability_now, reason_codes, topic_confidence,
+                classifier_trace, model_route_used, created_at
+            ) VALUES (
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+            )
             """,
             (
                 topic_id,
@@ -359,6 +445,20 @@ def main() -> int:
                 evidence_status,
                 json.dumps(evidence_reasons, ensure_ascii=True),
                 evidence_ui_state,
+                candidate_type,
+                post_intent,
+                json.dumps(artifact_types, ensure_ascii=True),
+                screenshot_required,
+                code_required,
+                transformability_score,
+                framework_agnostic_potential,
+                reader_pain_signal,
+                json.dumps(angle_fit_scores, ensure_ascii=True),
+                verification_cost,
+                draftability_now,
+                json.dumps(reason_codes, ensure_ascii=True),
+                float(topic_confidence),
+                json.dumps({"topic_slug": str(slug or "misc")}, ensure_ascii=True),
                 model_route_used,
                 now,
             ),
@@ -416,26 +516,12 @@ def main() -> int:
         if not entry_id:
             entry_id = f"topic-{_safe_slug(str(topic_id))}"
         discovery_total = round(float(candidate_row[1] or 0.0), 4) if candidate_row else 0.0
-        fetched_count = int(assessment.get("metrics", {}).get("fetched_count", 0) or 0)
-        source_count = int(assessment.get("metrics", {}).get("source_count", 0) or 0)
         recommendation = _recommendation_for(
             evidence_status=evidence_status,
             fetched_sources=fetched_count,
             topic_confidence=topic_confidence,
             source_count=source_count,
         )
-        threshold = float(os.getenv("TOPIC_CONFIDENCE_THRESHOLD", "0.3"))
-        reason_codes: list[str] = []
-        if evidence_status == "BLOCK":
-            reason_codes.append("EVIDENCE_BLOCK")
-        elif evidence_status == "WARN":
-            reason_codes.append("EVIDENCE_WARN")
-        if topic_confidence < threshold:
-            reason_codes.append("TOPIC_UNCERTAIN")
-        if fetched_count == 0:
-            reason_codes.append("NO_FETCHED_SOURCES")
-        if not reason_codes:
-            reason_codes.append("NONE")
 
         evidence_coverage = assessment.get("metrics", {}).get("fetched_ratio")
         source_quality = assessment.get("metrics", {}).get("avg_credibility")
@@ -508,18 +594,14 @@ def main() -> int:
                 "engagement": {},
             },
             "extraction": {
-                "candidate_type": "practitioner_help_request"
-                if "help" in str(candidate_row[11] if candidate_row else "").lower()
-                else "news_event",
-                "post_intent": ["showcase", "request_feedback"]
-                if "feedback" in str(candidate_row[11] if candidate_row else "").lower()
-                else ["discuss"],
+                "candidate_type": candidate_type,
+                "post_intent": [post_intent],
                 "domains": [str(slug or "misc")],
                 "stack_detected": [],
                 "core_problem": (claims[0].get("problem_pressure", "") if claims else ""),
                 "solution_pattern": (claims[0].get("proposed_solution", "") if claims else ""),
                 "author_ask": [],
-                "artifacts_present": [],
+                "artifacts_present": artifact_types,
             },
             "classification": {
                 "topic_primary": str(slug or "misc"),
@@ -581,6 +663,11 @@ def main() -> int:
                 "media_links": [],
             },
         }
+        dossier["normalized_candidate"] = {
+            "extraction": dossier.get("extraction", {}),
+            "classification": dossier.get("classification", {}),
+        }
+        dossier["editorial_decision_dossier"] = dossier.get("editorial", {})
         conn.execute(
             """
             INSERT OR REPLACE INTO candidate_dossiers (
@@ -596,13 +683,19 @@ def main() -> int:
                 "2.0.0",
                 json.dumps(dossier.get("raw_capture", {}), ensure_ascii=True),
                 json.dumps(
-                    {
-                        "extraction": dossier.get("extraction", {}),
-                        "classification": dossier.get("classification", {}),
-                    },
+                    dossier.get(
+                        "normalized_candidate",
+                        {
+                            "extraction": dossier.get("extraction", {}),
+                            "classification": dossier.get("classification", {}),
+                        },
+                    ),
                     ensure_ascii=True,
                 ),
-                json.dumps(dossier.get("editorial", {}), ensure_ascii=True),
+                json.dumps(
+                    dossier.get("editorial_decision_dossier", dossier.get("editorial", {})),
+                    ensure_ascii=True,
+                ),
                 json.dumps(dossier.get("scoring", {}).get("discovery", {}), ensure_ascii=True),
                 json.dumps(
                     dossier.get("scoring", {}).get("publishability", {}),

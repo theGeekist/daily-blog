@@ -346,7 +346,7 @@ No new overlap with `.sisyphus/plans/` documents. Phases 5–9 address operation
 
 ## Phase 10: Candidate Dossier v2 (grounded editorial decision artifact)
 
-**Status:** In progress (10A partial shipped on 2026-02-22)
+**Status:** Phase 10A completed (2026-02-22)
 **Why now:** Current candidate export mixes raw capture, scoring internals, cross-topic synthesis, and generic editorial scaffolding. The result is hard to trust for actual editorial decisions.
 
 ### Completion notes (2026-02-22)
@@ -358,15 +358,25 @@ No new overlap with `.sisyphus/plans/` documents. Phases 5–9 address operation
 - Added dossier export generation in `generate_editorial.py`:
   - per-candidate `candidate.json`
   - per-candidate `candidate.md`
+- Completed 10A schema alignment in `editorial_candidates`:
+  - added 14 deterministic columns (`candidate_type`, `post_intent`, `artifact_types_present`,
+    `screenshot_required`, `code_required`, `transformability_score`,
+    `framework_agnostic_potential`, `reader_pain_signal`, `angle_fit_scores`,
+    `verification_cost`, `draftability_now`, `reason_codes`, `topic_confidence`,
+    `classifier_trace`) in both runtime migration (`store.py`) and SQL migration (`migrate_v2.sql`).
 - Added viewer payload support for dossiers in `scripts/insights_viewer.py` and dossier-aware markdown export path in `docs/viewer/dashboard.html`.
-- Added partial null-safe evidence behavior in `daily_blog/editorial/evidence.py`:
+- Completed null-safe evidence behavior in `daily_blog/editorial/evidence.py`:
   - `avg_credibility=None` when `fetched_count==0`
   - `domain_diversity=None` when `fetched_count==0`
+  - `fetched_ratio=None` when `total_sources==0`
+  - duplicate zero-source fetched-ratio reasons removed
   - `publishability_state` metric emitted
-- Deferred/not completed in this pass:
-  - 10A contract of adding 14 new columns to `editorial_candidates` (used separate `candidate_dossiers` table instead)
-  - strict `editorial_decision_dossier` naming contract in emitted JSON
-  - dedicated `test_candidate_dossier_v2.py` coverage
+- Completed dossier layer contract:
+  - `candidate.json` now includes `raw_capture`, `normalized_candidate`, and
+    `editorial_decision_dossier` (with backward-compatible legacy keys retained).
+  - `meta.dossier_scope` now distinguishes `"entry"` vs `"topic"` dossiers.
+- Deferred beyond 10A:
+  - dedicated `test_candidate_dossier_v2.py` coverage (tracked under testing additions).
 
 ### External review notes tracking
 
@@ -520,12 +530,12 @@ All new fields are added to `editorial_candidates` via `ALTER TABLE ... ADD COLU
 
 ### Acceptance criteria (10A)
 
-- [ ] `editorial_candidates` table contains all 14 new columns after `store.py` migration runs.
+- [x] `editorial_candidates` table contains all 14 new columns after `store.py` migration runs.
 - [x] `compute_evidence_assessment` returns `avg_credibility=None` and `fetched_ratio=None` when no sources are fetched (not `0.0`).
-- [~] `candidate.json` and `candidate.md` are written for each non-blocked, non-misc topic per pipeline run.  
-  Completion note: shipped; generator now emits minimal dossier rows even when `candidate_scores` is unavailable.
-- [~] `candidate.json` is valid JSON and contains all three logical layers: `raw_capture`, `normalized_candidate`, `editorial_decision_dossier`.  
-  Completion note: current payload uses `raw_capture`, `normalized_candidate`, and `editorial`/`editorial_decision` naming; strict final naming still pending.
+- [x] `candidate.json` and `candidate.md` are written for each non-blocked, non-misc topic per pipeline run.  
+  Completion note: generator also emits topic-scope fallback dossiers when `candidate_scores` is unavailable.
+- [x] `candidate.json` is valid JSON and contains all three logical layers: `raw_capture`, `normalized_candidate`, `editorial_decision_dossier`.  
+  Completion note: legacy compatibility keys (`extraction`, `classification`, `editorial`) are retained in parallel.
 
 ### Tests (10A)
 

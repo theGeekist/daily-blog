@@ -1973,6 +1973,9 @@ def candidate_detail_payload(sqlite_path: Path, run_id: str, entry_id: str) -> d
                     str(row.get("normalized_candidate_json") or "{}")
                 ),
                 "editorial_decision": json.loads(str(row.get("editorial_decision_json") or "{}")),
+                "editorial_decision_dossier": json.loads(
+                    str(row.get("editorial_decision_json") or "{}")
+                ),
                 "scoring": {
                     "discovery": json.loads(str(row.get("discovery_score_json") or "{}")),
                     "publishability": json.loads(str(row.get("publishability_score_json") or "{}")),
