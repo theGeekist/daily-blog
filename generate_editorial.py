@@ -493,25 +493,6 @@ def main() -> int:
         md_lines.append("```")
         md_lines.append("")
 
-        research_pack.append(
-            {
-                "topic_id": topic_id,
-                "topic_label": label,
-                "time_horizon": time_horizon,
-                "angle": angle,
-                "audience": audience,
-                "sources": valid_sources,
-                "checklist": checklist,
-                "narrative_draft_markdown": narrative_draft,
-                "evidence_status": evidence_status,
-                "evidence_ui_state": evidence_ui_state,
-                "evidence_reasons": evidence_reasons,
-                "evidence_metrics": assessment.get("metrics", {}),
-                "evidence_brief": evidence_brief,
-                "evidence_synthesis_route": evidence_synthesis_route,
-            }
-        )
-
         dossier_scope = "entry" if entry_id else "topic"
         if not entry_id:
             entry_id = f"topic-{_safe_slug(str(topic_id))}"
@@ -561,6 +542,34 @@ def main() -> int:
             outline_sections = [
                 line.strip("# ").strip() for line in outline.splitlines() if line.startswith("## ")
             ][:5]
+        dossier_angle_titles = (
+            top_claims[:3]
+            if evidence_status == "BLOCK"
+            else [str(t).strip() for t in title_options[:3] if str(t).strip()]
+        )
+        if not dossier_angle_titles:
+            dossier_angle_titles = [str(label or "").strip()]
+
+        evidence_metrics_for_pack = dict(assessment.get("metrics", {}))
+        evidence_metrics_for_pack["publishability_state"] = publishability_state
+        research_pack.append(
+            {
+                "topic_id": topic_id,
+                "topic_label": label,
+                "time_horizon": time_horizon,
+                "angle": angle,
+                "audience": audience,
+                "sources": valid_sources,
+                "checklist": checklist,
+                "narrative_draft_markdown": narrative_draft,
+                "evidence_status": evidence_status,
+                "evidence_ui_state": evidence_ui_state,
+                "evidence_reasons": evidence_reasons,
+                "evidence_metrics": evidence_metrics_for_pack,
+                "evidence_brief": evidence_brief,
+                "evidence_synthesis_route": evidence_synthesis_route,
+            }
+        )
 
         dossier = {
             "meta": {
@@ -640,7 +649,7 @@ def main() -> int:
                 "why_interesting": str(why or "").strip(),
                 "angles": [
                     {"title": t, "type": "candidate-specific", "fit_score": 0.75}
-                    for t in title_options[:3]
+                    for t in dossier_angle_titles
                 ],
                 "verification_plan": checklist,
                 "outline_seed": {

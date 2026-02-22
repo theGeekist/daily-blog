@@ -49,7 +49,7 @@ def compute_evidence_assessment(
         reasons.append(
             f"fetched_ratio={effective_fetched_ratio:.2f} below minimum {min_fetched_ratio:.2f}"
         )
-    if avg_cred < min_avg_cred:
+    if fetched_count > 0 and avg_cred < min_avg_cred:
         status = "BLOCK"
         reasons.append(f"avg_credibility={avg_cred:.2f} below minimum {min_avg_cred:.2f}")
     if block_anecdote and evidence_types == {"anecdote"} and total_sources < min_sources:
@@ -63,7 +63,7 @@ def compute_evidence_assessment(
                 "fetched_ratio="
                 f"{effective_fetched_ratio:.2f} below recommended {warn_min_fetched_ratio:.2f}"
             )
-        if avg_cred < warn_min_avg_cred:
+        if fetched_count > 0 and avg_cred < warn_min_avg_cred:
             status = "WARN"
             reasons.append(
                 f"avg_credibility={avg_cred:.2f} below recommended {warn_min_avg_cred:.2f}"
