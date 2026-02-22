@@ -65,5 +65,4 @@ CREATE TABLE IF NOT EXISTS run_metrics (
     PRIMARY KEY (run_id, stage_name)
 );
 
-ALTER TABLE claims ADD COLUMN model_route_used TEXT;
-ALTER TABLE topic_clusters ADD COLUMN model_route_used TEXT;
+-- model_route_used already exists in the CREATE TABLE statements above.

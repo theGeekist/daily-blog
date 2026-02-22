@@ -78,9 +78,11 @@ def main() -> int:
         topic_evidence_types.setdefault(key, set()).add(str(evidence_type or "").strip().lower())
 
     skip_misc = os.getenv("EDITORIAL_INCLUDE_MISC", "0") != "1"
+    generated_count = 0
     for topic_id, label, why, time_horizon, slug in topics:
         if skip_misc and str(slug) == "misc":
             continue
+        generated_count += 1
         try:
             claim_rows = conn.execute(
                 """
@@ -250,7 +252,7 @@ def main() -> int:
         json.dumps(research_pack, ensure_ascii=True, indent=2), encoding="utf-8"
     )
 
-    print(f"Editorial candidates generated: {len(topics)}")
+    print(f"Editorial candidates generated: {generated_count}")
     print(f"Outlines path: {outlines_path}")
     print(f"Research pack path: {research_path}")
     return 0

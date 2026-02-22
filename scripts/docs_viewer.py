@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import functools
 import os
 import webbrowser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -14,10 +15,14 @@ def main() -> int:
     args = parser.parse_args()
 
     root = Path(__file__).resolve().parent.parent
-    os.chdir(root)
+    docs_dir = root / "docs" / "viewer"
+    if not docs_dir.is_dir():
+        print(f"Docs directory not found: {docs_dir}")
+        return 1
 
-    server = ThreadingHTTPServer((args.host, args.port), SimpleHTTPRequestHandler)
-    url = f"http://{args.host}:{args.port}/docs/viewer/index.html"
+    handler = functools.partial(SimpleHTTPRequestHandler, directory=str(docs_dir))
+    server = ThreadingHTTPServer((args.host, args.port), handler)
+    url = f"http://{args.host}:{args.port}/index.html"
 
     print(f"Serving docs viewer at {url}")
     print("Press Ctrl+C to stop.")

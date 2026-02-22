@@ -31,6 +31,33 @@ DEFAULT_PIPELINE_TIMEOUTS_PATH = (
 DEFAULT_STAGE_TIMEOUT_SECONDS = 300
 
 
+def _format_seconds(seconds: float) -> str:
+    if seconds < 60:
+        return f"{seconds:.1f}s"
+    minutes = int(seconds // 60)
+    rem = seconds - (minutes * 60)
+    return f"{minutes}m {rem:.1f}s"
+
+
+def _print_pipeline_header(
+    *,
+    run_id: str,
+    sqlite_path: Path,
+    retries: int,
+    stages: list[str],
+    stage_timeouts: dict[str, int],
+) -> None:
+    print("=" * 78)
+    print(f"Daily Blog Pipeline | run_id={run_id}")
+    print(f"DB: {sqlite_path}")
+    print(f"Stages: {len(stages)} | Retries per stage: {retries}")
+    print("Stage plan:")
+    for index, stage in enumerate(stages, start=1):
+        timeout = stage_timeouts.get(stage, DEFAULT_STAGE_TIMEOUT_SECONDS)
+        print(f"  {index:>2}. {stage:<18} timeout={timeout}s")
+    print("=" * 78)
+
+
 def _read_int_env(name: str, default: int) -> int:
     raw = os.getenv(name)
     if raw is None:
@@ -107,11 +134,26 @@ def main() -> int:
         retries=retries,
     )
     persist_run_snapshot(conn, run_id, current_snapshot)
+    _print_pipeline_header(
+        run_id=run_id,
+        sqlite_path=sqlite_path,
+        retries=retries,
+        stages=[stage.name for stage in stages],
+        stage_timeouts=stage_timeouts,
+    )
 
-    for stage in stages:
+    summary_rows: list[tuple[str, bool, int, str, str]] = []
+    pipeline_started = time.time()
+
+    for index, stage in enumerate(stages, start=1):
         stage_name = stage.name
         started = now_iso()
         t0 = time.time()
+        print(
+            f"\n[{index}/{len(stages)}] START {stage_name} | "
+            f"timeout={stage_timeouts.get(stage_name, DEFAULT_STAGE_TIMEOUT_SECONDS)}s "
+            f"| retries={retries}"
+        )
         ok, out, error_message, route_used, model_used = run_stage(
             stage_name=stage_name,
             command=stage.command,
@@ -139,17 +181,41 @@ def main() -> int:
             "" if ok else error_message,
         )
 
-        print(f"[{stage_name}] {'OK' if ok else 'FAIL'}")
+        status_label = "OK" if ok else "FAIL"
+        print(
+            f"[{index}/{len(stages)}] {status_label} {stage_name} | "
+            f"elapsed={_format_seconds(duration_ms / 1000)} | "
+            f"route={route_used} | model={model_used}"
+        )
         if out:
             print(out)
+        summary_rows.append((stage_name, ok, duration_ms, route_used, model_used))
         if not ok:
             persist_run_delta(conn, run_id, current_snapshot)
             conn.close()
+            print("\nPipeline aborted due to stage failure.\n")
+            print("Summary:")
+            for name, stage_ok, stage_duration_ms, route, model in summary_rows:
+                marker = "OK  " if stage_ok else "FAIL"
+                print(
+                    f"  {marker} {name:<18} "
+                    f"{_format_seconds(stage_duration_ms / 1000):>8}  "
+                    f"route={route:<8} model={model}"
+                )
             return 1
 
     persist_run_delta(conn, run_id, current_snapshot)
     conn.close()
-    print(f"Pipeline run complete: {run_id}")
+    pipeline_elapsed = _format_seconds(time.time() - pipeline_started)
+    print("\nPipeline complete.\n")
+    print("Summary:")
+    for name, stage_ok, stage_duration_ms, route, model in summary_rows:
+        marker = "OK  " if stage_ok else "FAIL"
+        print(
+            f"  {marker} {name:<18} "
+            f"{_format_seconds(stage_duration_ms / 1000):>8}  route={route:<8} model={model}"
+        )
+    print(f"\nRun complete: {run_id} | total_elapsed={pipeline_elapsed}")
     return 0
 
 

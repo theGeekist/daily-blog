@@ -7,7 +7,10 @@ import time
 import unittest
 from pathlib import Path
 
-from tests.create_fixture_db import create_fixture_db
+try:
+    from tests.create_fixture_db import create_fixture_db
+except ModuleNotFoundError:  # Allows direct execution: python tests/test_e2e_deterministic.py
+    from create_fixture_db import create_fixture_db
 
 
 class TestE2EDeterministic(unittest.TestCase):

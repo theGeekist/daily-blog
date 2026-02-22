@@ -1,6 +1,7 @@
 import os
 import re
 import subprocess
+import threading
 import time
 import traceback
 from typing import Any
@@ -145,11 +146,12 @@ def run_stage(
         env["MODEL_ROUTING_STAGE"] = stage_route_key
 
         try:
-            proc = subprocess.run(
-                command,
-                capture_output=True,
-                text=True,
-                timeout=timeout_seconds,
+            proc = _run_subprocess_with_heartbeat(
+                stage_name=stage_name,
+                attempt=attempt,
+                total_attempts=total_attempts,
+                command=command,
+                timeout_seconds=timeout_seconds,
                 env=env,
             )
         except subprocess.TimeoutExpired as exc:
@@ -196,3 +198,50 @@ def run_stage(
     if not last_output:
         last_output = last_error
     return False, last_output, last_error, last_route_used, last_model_used
+
+
+def _run_subprocess_with_heartbeat(
+    *,
+    stage_name: str,
+    attempt: int,
+    total_attempts: int,
+    command: list[str],
+    timeout_seconds: int,
+    env: dict[str, str],
+) -> subprocess.CompletedProcess[str]:
+    heartbeat_seconds = 15
+    started = time.time()
+    result: dict[str, Any] = {"proc": None, "error": None}
+
+    def _target() -> None:
+        try:
+            result["proc"] = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                timeout=timeout_seconds,
+                env=env,
+            )
+        except Exception as exc:  # pragma: no cover - exercised via caller behavior
+            result["error"] = exc
+
+    thread = threading.Thread(target=_target, daemon=True)
+    thread.start()
+
+    while thread.is_alive():
+        thread.join(timeout=heartbeat_seconds)
+        if thread.is_alive():
+            elapsed = int(time.time() - started)
+            print(
+                f"[{stage_name}] Attempt {attempt}/{total_attempts} still running... "
+                f"elapsed={elapsed}s"
+            )
+
+    error = result.get("error")
+    if error is not None:
+        raise error
+
+    proc = result.get("proc")
+    if proc is None:  # pragma: no cover - defensive
+        raise RuntimeError("subprocess finished without result")
+    return proc

@@ -14,6 +14,7 @@ import urllib.request
 import webbrowser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from typing import TextIO
 from urllib.parse import parse_qs, urlparse
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -34,6 +35,7 @@ DEFAULT_PIPELINE_TIMEOUTS = ROOT / "config" / "pipeline-timeouts.json"
 _REDDIT_CACHE: dict[str, dict] = {}
 _RUN_LOCK = threading.Lock()
 _RUN_PROC: subprocess.Popen | None = None
+_RUN_LOG_HANDLE: TextIO | None = None
 _RUN_LOG = ROOT / "data" / "insights_run.log"
 _STAGES = [
     "ingest",
@@ -49,6 +51,13 @@ _STAGES = [
 def dict_rows(cursor: sqlite3.Cursor) -> list[dict]:
     columns = [d[0] for d in cursor.description]
     return [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+
+def _safe_int(value: str, default: int) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
 
 
 def query_db(sqlite_path: Path, query: str, params: tuple = ()) -> list[dict]:
@@ -2060,7 +2069,7 @@ class InsightsHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/candidates":
             qs = parse_qs(parsed.query)
             run_id = qs.get("run_id", [latest_run_id(self.sqlite_path)])[0]
-            limit = int(qs.get("limit", ["25"])[0])
+            limit = _safe_int(qs.get("limit", ["25"])[0], 25)
             self._json(candidates_payload(self.sqlite_path, run_id, limit))
             return
         if parsed.path == "/api/topics":
@@ -2070,12 +2079,12 @@ class InsightsHandler(SimpleHTTPRequestHandler):
             return
         if parsed.path == "/api/runs":
             qs = parse_qs(parsed.query)
-            limit = int(qs.get("limit", ["30"])[0])
+            limit = _safe_int(qs.get("limit", ["30"])[0], 30)
             self._json(runs_payload(self.sqlite_path, limit))
             return
         if parsed.path == "/api/sources":
             qs = parse_qs(parsed.query)
-            limit = int(qs.get("limit", ["40"])[0])
+            limit = _safe_int(qs.get("limit", ["40"])[0], 40)
             topic_id = qs.get("topic_id", [""])[0]
             topic_slug = qs.get("topic_slug", [""])[0]
             fetched_only = qs.get("fetched_only", ["0"])[0] == "1"
@@ -2127,25 +2136,43 @@ class InsightsHandler(SimpleHTTPRequestHandler):
             return
         if parsed.path == "/api/ui_metrics":
             qs = parse_qs(parsed.query)
-            limit = int(qs.get("limit", ["30"])[0])
+            limit = _safe_int(qs.get("limit", ["30"])[0], 30)
             self._json(ui_metrics_payload(self.sqlite_path, limit=limit))
             return
         return super().do_GET()
 
 
+def _close_run_log_handle() -> None:
+    global _RUN_LOG_HANDLE
+    if _RUN_LOG_HANDLE is not None:
+        try:
+            _RUN_LOG_HANDLE.close()
+        except Exception:
+            pass
+    _RUN_LOG_HANDLE = None
+
+
 def start_pipeline_run(force: bool = False) -> tuple[bool, str]:
-    global _RUN_PROC
+    global _RUN_PROC, _RUN_LOG_HANDLE
     with _RUN_LOCK:
+        if _RUN_PROC and _RUN_PROC.poll() is not None:
+            _close_run_log_handle()
         if _RUN_PROC and _RUN_PROC.poll() is None and not force:
             return False, "Pipeline run already in progress"
         if _RUN_PROC and _RUN_PROC.poll() is None and force:
             _RUN_PROC.terminate()
+            try:
+                _RUN_PROC.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                _RUN_PROC.kill()
+                _RUN_PROC.wait(timeout=5)
+            _close_run_log_handle()
         _RUN_LOG.parent.mkdir(parents=True, exist_ok=True)
-        log_handle = _RUN_LOG.open("w", encoding="utf-8")
+        _RUN_LOG_HANDLE = _RUN_LOG.open("w", encoding="utf-8")
         _RUN_PROC = subprocess.Popen(
             ["python3", "run_pipeline.py"],
             cwd=ROOT,
-            stdout=log_handle,
+            stdout=_RUN_LOG_HANDLE,
             stderr=subprocess.STDOUT,
             text=True,
             env={**os.environ, "PYTHONUNBUFFERED": "1"},
@@ -2156,6 +2183,8 @@ def start_pipeline_run(force: bool = False) -> tuple[bool, str]:
 def run_status_payload(sqlite_path: Path) -> dict:
     with _RUN_LOCK:
         proc = _RUN_PROC
+        if proc and proc.poll() is not None:
+            _close_run_log_handle()
     running = bool(proc and proc.poll() is None)
     return_code = proc.poll() if proc else None
 
@@ -2174,13 +2203,19 @@ def run_status_payload(sqlite_path: Path) -> dict:
                 if stage in stage_index and stages[stage_index[stage]]["status"] == "pending":
                     stages[stage_index[stage]]["status"] = "running"
                 continue
-            m = re.match(r"^\[([^\]]+)\]\s+(OK|FAIL)$", line.strip())
-            if not m:
+            old_match = re.match(r"^\[([^\]]+)\]\s+(OK|FAIL)$", line.strip())
+            new_match = re.match(r"^\[\d+/\d+\]\s+(OK|FAIL)\s+([a-z_]+)\s+\|.*$", line.strip())
+            if old_match:
+                stage = old_match.group(1)
+                status = "ok" if old_match.group(2) == "OK" else "failed"
+                if stage in stage_index:
+                    stages[stage_index[stage]]["status"] = status
                 continue
-            stage = m.group(1)
-            status = "ok" if m.group(2) == "OK" else "failed"
-            if stage in stage_index:
-                stages[stage_index[stage]]["status"] = status
+            if new_match:
+                status = "ok" if new_match.group(1) == "OK" else "failed"
+                stage = new_match.group(2)
+                if stage in stage_index:
+                    stages[stage_index[stage]]["status"] = status
 
     completed = sum(1 for s in stages if s["status"] in {"ok", "failed"})
     running_count = sum(1 for s in stages if s["status"] == "running")
@@ -2222,6 +2257,12 @@ def main() -> int:
         with _RUN_LOCK:
             if _RUN_PROC and _RUN_PROC.poll() is None:
                 _RUN_PROC.terminate()
+                try:
+                    _RUN_PROC.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    _RUN_PROC.kill()
+                    _RUN_PROC.wait(timeout=5)
+            _close_run_log_handle()
         server.server_close()
     return 0
 

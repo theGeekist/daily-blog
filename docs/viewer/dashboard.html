@@ -1164,12 +1164,12 @@
         document.getElementById("evidence-top-claims").innerHTML = (claimAnchors.length
           ? claimAnchors
           : ["No claim anchors extracted for this topic yet."])
-          .map((item) => `<li>${item}</li>`)
+          .map((item) => `<li>${escapeHtml(item)}</li>`)
           .join("");
 
         const guidance = buildOutlineGuidance(brief);
         document.getElementById("evidence-outline-guidance").innerHTML = guidance
-          .map((item) => `<li>${item}</li>`)
+          .map((item) => `<li>${escapeHtml(item)}</li>`)
           .join("");
       }
 
@@ -1184,15 +1184,17 @@
       function formatSourceContext(s) {
         const stance = String(s.stance || "neutral");
         const credibility = String(s.credibility_guess || "unknown");
+        const href = safeHref(s.url);
+        const linkLabel = escapeHtml(s.domain || s.url || "source");
         return `
           <li class="evidence-source-item">
             <div class="row">
-              <a href="${s.url}" target="_blank">${s.domain || s.url}</a>
-              <span class="small">${s.topic_label || s.topic_slug || s.topic_id || ""}</span>
+              <a href="${href}" target="_blank" rel="noopener noreferrer">${linkLabel}</a>
+              <span class="small">${escapeHtml(s.topic_label || s.topic_slug || s.topic_id || "")}</span>
             </div>
             <div class="meta">
-              <span class="${badgeClass(credibility === "high" ? "high" : credibility === "low" ? "low" : "medium")}">${credibility}</span>
-              <span class="${badgeClass(stance === "contradicts" ? "low" : stance === "supports" ? "high" : "medium")}">${stance}</span>
+              <span class="${badgeClass(credibility === "high" ? "high" : credibility === "low" ? "low" : "medium")}">${escapeHtml(credibility)}</span>
+              <span class="${badgeClass(stance === "contradicts" ? "low" : stance === "supports" ? "high" : "medium")}">${escapeHtml(stance)}</span>
             </div>
           </li>`;
       }
@@ -1257,6 +1259,24 @@
         const tmp = document.createElement("div");
         tmp.innerHTML = String(raw || "");
         return (tmp.textContent || tmp.innerText || "").replace(/\s+/g, " ").trim();
+      }
+
+      function escapeHtml(raw) {
+        const el = document.createElement("span");
+        el.textContent = String(raw || "");
+        return el.innerHTML;
+      }
+
+      function safeHref(raw) {
+        const value = String(raw || "").trim();
+        if (!value) return "#";
+        try {
+          const parsed = new URL(value, window.location.origin);
+          if (parsed.protocol === "http:" || parsed.protocol === "https:") return parsed.href;
+          return "#";
+        } catch {
+          return "#";
+        }
       }
 
       function cleanCandidateSummary(raw) {
@@ -1533,11 +1553,12 @@
         document.getElementById("detail-empty").style.display = "none";
         document.getElementById("detail").style.display = "block";
         document.getElementById("detail-title").textContent = c.title || "(untitled)";
+        const sourceHref = safeHref(c.url);
         document.getElementById("detail-meta").innerHTML = `
-          rank #${c.rank_index} | topic: ${c.topic} | score: ${num(c.final_score).toFixed(3)} | novelty: ${c.novelty_status}
-          | posted: ${formatIso(c.published)}
+          rank #${escapeHtml(c.rank_index)} | topic: ${escapeHtml(c.topic)} | score: ${num(c.final_score).toFixed(3)} | novelty: ${escapeHtml(c.novelty_status)}
+          | posted: ${escapeHtml(formatIso(c.published))}
           ${socialParts.length ? `| ${socialParts.join(" | ")}` : "| social metrics unavailable from source"}
-          ${c.url ? `| <a href="${c.url}" target="_blank">source link</a>` : ""}`;
+          ${sourceHref !== "#" ? `| <a href="${sourceHref}" target="_blank" rel="noopener noreferrer">source link</a>` : ""}`;
         document.getElementById("detail-summary").textContent =
           cleanCandidateSummary(c.summary) || "No summary available.";
 
@@ -1546,7 +1567,14 @@
 
         const contextLinks = extractContextLinks(c.summary || "", c.url || "");
         document.getElementById("context-links").innerHTML = contextLinks.length
-          ? contextLinks.map((u) => `<li><a href="${u}" target="_blank">${u}</a></li>`).join("")
+          ? contextLinks
+              .map((u) => {
+                const href = safeHref(u);
+                const label = escapeHtml(u);
+                if (href === "#") return `<li>${label}</li>`;
+                return `<li><a href="${href}" target="_blank" rel="noopener noreferrer">${label}</a></li>`;
+              })
+              .join("")
           : "<li>No links/media detected in this post.</li>";
 
         const metadata = computePostMetadata(c, social, detail);
@@ -1569,8 +1597,16 @@
 
         const titles = parseJsonArray(editorial.title_options_json);
         const checklist = parseJsonArray(editorial.verification_checklist_json);
-        document.getElementById("editorial-titles").innerHTML = (titles.length ? titles : ["No generated titles"]).map((x) => `<li>${x}</li>`).join("");
-        document.getElementById("editorial-checklist").innerHTML = (checklist.length ? checklist : ["No checklist available"]).map((x) => `<li>${x}</li>`).join("");
+        document.getElementById("editorial-titles").innerHTML = (
+          titles.length ? titles : ["No generated titles"]
+        )
+          .map((x) => `<li>${escapeHtml(x)}</li>`)
+          .join("");
+        document.getElementById("editorial-checklist").innerHTML = (
+          checklist.length ? checklist : ["No checklist available"]
+        )
+          .map((x) => `<li>${escapeHtml(x)}</li>`)
+          .join("");
         document.getElementById("editorial-outline").textContent =
           editorial.outline_markdown || "No outline available for this candidate/topic.";
         document.getElementById("editorial-narrative").textContent =

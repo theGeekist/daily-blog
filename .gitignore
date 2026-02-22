@@ -12,9 +12,11 @@ venv/
 
 # Local environment
 .env
+feeds.txt
 
 # Generated pipeline data
 data/*.db
+data/*.db-journal
 data/*.jsonl
 data/pipeline.log
 
@@ -22,6 +24,11 @@ data/pipeline.log
 data/daily_board.md
 data/top_outlines.md
 data/research_pack.json
+
+# Packaging/build artifacts
+*.egg-info/
+build/
+dist/
+
 # Node dependencies
 node_modules/
-feeds.txt.claude/
