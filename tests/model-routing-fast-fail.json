@@ -1,0 +1,8 @@
+{
+  "extractor": {"primary": "gemini:gemini-2.0-flash", "fallback": "gemini:gemini-2.0-flash"},
+  "topic_lifter": {"primary": "gemini:gemini-2.0-flash", "fallback": "gemini:gemini-2.0-flash"},
+  "topic_curator": {"primary": "gemini:gemini-2.0-flash", "fallback": "gemini:gemini-2.0-flash"},
+  "enrichment": {"primary": "gemini:gemini-2.0-flash", "fallback": "gemini:gemini-2.0-flash"},
+  "evidence_synthesis": {"primary": "gemini:gemini-2.0-flash", "fallback": "gemini:gemini-2.0-flash"},
+  "editorial": {"primary": "gemini:gemini-2.0-flash", "fallback": "gemini:gemini-2.0-flash"}
+}

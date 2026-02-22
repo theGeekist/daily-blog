@@ -6,7 +6,7 @@ import time
 import unittest
 from pathlib import Path
 
-from create_fixture_db import create_fixture_db
+from tests.create_fixture_db import create_fixture_db
 
 
 class TestE2EDeterministic(unittest.TestCase):
@@ -26,11 +26,13 @@ class TestE2EDeterministic(unittest.TestCase):
             "DAILY_BOARD_PATH": str(self.root / "daily_board.md"),
             "TOP_OUTLINES_PATH": str(self.root / "top_outlines.md"),
             "RESEARCH_PACK_PATH": str(self.root / "research_pack.json"),
+            "MODEL_ROUTING_CONFIG": str(Path.cwd() / "tests" / "model-routing-fast-fail.json"),
             "PATH": "/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin",
             "ENRICH_SKIP_MODEL": "1",
             "ENRICH_SEARCH_BACKEND": "searxng",
             "SEARXNG_BASE_URL": "http://127.0.0.1:1",
             "EDITORIAL_STATIC_ONLY": "1",
+            "GOOGLE_API_KEY": "",
         }
         proc = subprocess.run(
             ["python3", script_name],

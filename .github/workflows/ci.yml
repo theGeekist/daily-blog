@@ -5,8 +5,15 @@ on:
   pull_request:
 
 jobs:
-  test:
+  quality-and-fast:
     runs-on: ubuntu-latest
+    env:
+      GOOGLE_API_KEY: ""
+      MODEL_ROUTING_CONFIG: tests/model-routing-fast-fail.json
+      ENRICH_SKIP_MODEL: "1"
+      ENRICH_SEARCH_BACKEND: searxng
+      SEARXNG_BASE_URL: http://127.0.0.1:1
+      EDITORIAL_STATIC_ONLY: "1"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -15,11 +22,13 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: "pip"
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements-dev.txt
+          python -m pip install -e .
 
       - name: Lint
         run: ruff check .
@@ -27,5 +36,42 @@ jobs:
       - name: Type check
         run: basedpyright
 
-      - name: Run tests
-        run: python -m unittest discover -s tests
+      - name: Run fast tests
+        run: python tests/run_suites.py fast
+
+  slow-tests:
+    runs-on: ubuntu-latest
+    needs: quality-and-fast
+    strategy:
+      fail-fast: false
+      matrix:
+        module:
+          - tests.test_lift_topics
+          - tests.test_normalize_topics
+          - tests.test_pipeline_stages
+          - tests.test_e2e_deterministic
+    env:
+      GOOGLE_API_KEY: ""
+      MODEL_ROUTING_CONFIG: tests/model-routing-fast-fail.json
+      ENRICH_SKIP_MODEL: "1"
+      ENRICH_SEARCH_BACKEND: searxng
+      SEARXNG_BASE_URL: http://127.0.0.1:1
+      EDITORIAL_STATIC_ONLY: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+          python -m pip install -e .
+
+      - name: Run slow suite module
+        run: python -m unittest ${{ matrix.module }}

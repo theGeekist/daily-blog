@@ -106,7 +106,7 @@ def fetch_model_sources(
             stance = "neutral"
         credibility = str(item.get("credibility_guess", "")).strip().lower()
         if credibility not in {"low", "medium", "high"}:
-            credibility = credibility_for_domain(domain)
+            credibility = credibility_for_domain(domain, url)
         validated.append(
             {
                 "url": url,

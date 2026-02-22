@@ -1,5 +1,4 @@
 import json
-import os
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict
@@ -44,8 +43,6 @@ def synthesize_evidence_brief(
         validated_sources=validated_sources,
         fallback_brief=fallback,
     )
-    if not os.getenv("GOOGLE_API_KEY", "").strip():
-        return fallback, "deterministic-synthesis:no-google-api-key"
 
     try:
         result = call_model(EVIDENCE_SYNTHESIS_STAGE, prompt, schema=EVIDENCE_BRIEF_SCHEMA)

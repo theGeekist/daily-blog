@@ -9,8 +9,8 @@ description = "RSS-first pipeline for daily topic discovery and editorial prep"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "duckduckgo-search>=6.0.0",
-    "google-generativeai>=0.8.0",
+    "ddgs>=9.10.0",
+    "google-genai>=1.64.0",
     "ollama>=0.4.0",
     "pydantic>=2.0.0",
 ]

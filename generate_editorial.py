@@ -46,7 +46,7 @@ def main() -> int:
     rules_obj = load_rules(rules_path)
     topics = conn.execute(
         """
-        SELECT topic_id, parent_topic_label, why_it_matters, time_horizon
+        SELECT topic_id, parent_topic_label, why_it_matters, time_horizon, parent_topic_slug
         FROM topic_clusters
         ORDER BY claim_count DESC
         """
@@ -77,7 +77,10 @@ def main() -> int:
             continue
         topic_evidence_types.setdefault(key, set()).add(str(evidence_type or "").strip().lower())
 
-    for topic_id, label, why, time_horizon in topics:
+    skip_misc = os.getenv("EDITORIAL_INCLUDE_MISC", "0") != "1"
+    for topic_id, label, why, time_horizon, slug in topics:
+        if skip_misc and str(slug) == "misc":
+            continue
         try:
             claim_rows = conn.execute(
                 """

@@ -108,7 +108,12 @@ class TestNormalizeTopics(unittest.TestCase):
         self.tmp.cleanup()
 
     def test_normalize_topics_outputs_curated_labels(self) -> None:
-        env = {**os.environ, "SQLITE_PATH": str(self.db)}
+        env = {
+            **os.environ,
+            "SQLITE_PATH": str(self.db),
+            "MODEL_ROUTING_CONFIG": str(Path.cwd() / "tests" / "model-routing-fast-fail.json"),
+            "GOOGLE_API_KEY": "",
+        }
         proc = subprocess.run(
             ["python3", "normalize_topics.py"],
             env=env,

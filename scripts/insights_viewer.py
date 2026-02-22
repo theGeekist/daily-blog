@@ -1913,7 +1913,7 @@ def candidate_detail_payload(sqlite_path: Path, run_id: str, entry_id: str) -> d
                    talking_points_json, narrative_draft_markdown,
                    verification_checklist_json, angle, audience,
                    evidence_status, evidence_reasons_json,
-                   evidence_ui_state, model_route_used
+                   evidence_ui_state, evidence_brief_json, model_route_used
             FROM editorial_candidates
             WHERE topic_id IN ({placeholders})
             """,

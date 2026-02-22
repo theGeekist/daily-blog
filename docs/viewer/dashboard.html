@@ -158,10 +158,8 @@
         border: 1px solid var(--line);
         border-radius: 6px;
         font-size: 11px;
-        white-space: nowrap;
-        max-width: 200px;
-        overflow: hidden;
-        text-overflow: ellipsis;
+        white-space: normal;
+        word-break: break-word;
       }
       .topic-chip {
         border: none;
@@ -225,6 +223,68 @@
       .evidence-gate.ok { border-left-color: var(--ok); background: #f1fbf5; }
       .evidence-gate.warn { border-left-color: var(--warn); background: #fff6eb; }
       .evidence-gate.bad { border-left-color: var(--bad); background: #fff1f1; }
+      .evidence-brief-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+      .evidence-mini {
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 8px;
+        background: #fbfcff;
+      }
+      .evidence-mini h4 {
+        margin: 0 0 4px;
+        font-size: 12px;
+      }
+      .evidence-mini p {
+        margin: 0;
+        font-size: 12px;
+        line-height: 1.45;
+      }
+      .evidence-source-list {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: grid;
+        gap: 6px;
+      }
+      .evidence-source-item {
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 7px;
+        background: #fff;
+      }
+      .evidence-source-item .row {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        align-items: baseline;
+      }
+      .evidence-source-item .meta {
+        margin-top: 4px;
+      }
+      .md-export-actions {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 8px;
+      }
+      .md-export-status {
+        margin-bottom: 6px;
+      }
+      #candidate-md-output {
+        width: 100%;
+        min-height: 240px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 8px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 12px;
+        line-height: 1.42;
+        resize: vertical;
+        background: #fff;
+      }
       .score-row {
         display: grid;
         grid-template-columns: 110px 1fr 45px;
@@ -405,8 +465,38 @@
             <div id="evidence-gate" class="evidence-gate" hidden></div>
 
             <div class="box" style="margin-bottom:8px">
+              <h3>Evidence to Outline Brief</h3>
+              <p id="evidence-brief-summary">No evidence brief available.</p>
+              <div class="evidence-brief-grid" style="margin-top:8px">
+                <div class="evidence-mini">
+                  <h4>Strategy</h4>
+                  <p id="evidence-strategy">-</p>
+                </div>
+                <div class="evidence-mini">
+                  <h4>Dominant Pattern</h4>
+                  <p id="evidence-pattern">-</p>
+                </div>
+              </div>
+              <div class="detail-grid" style="margin-top:8px">
+                <div class="box">
+                  <h3 style="margin:0 0 6px">Key Claims To Anchor</h3>
+                  <ul id="evidence-top-claims"></ul>
+                </div>
+                <div class="box">
+                  <h3 style="margin:0 0 6px">How This Shapes The Outline</h3>
+                  <ul id="evidence-outline-guidance"></ul>
+                </div>
+              </div>
+            </div>
+
+            <div class="box" style="margin-bottom:8px">
               <h3>Context Links / Media</h3>
               <ul id="context-links"></ul>
+            </div>
+
+            <div class="box" style="margin-bottom:8px">
+              <h3>Validated Evidence Sources (Contextualized)</h3>
+              <ul id="detail-evidence-sources" class="evidence-source-list"></ul>
             </div>
 
             <div class="meta-grid" id="post-metadata"></div>
@@ -452,6 +542,22 @@
             <div class="box" style="margin-top:8px">
               <h3>Narrative Draft Sketch</h3>
               <pre id="editorial-narrative" style="white-space: pre-wrap; font-size: 12px;"></pre>
+            </div>
+
+            <div class="box" style="margin-top:8px">
+              <h3>Discussion Markdown Export</h3>
+              <p class="small md-export-status" id="candidate-md-status">
+                Generate a full candidate dossier in markdown, then copy for external discussion.
+              </p>
+              <div class="md-export-actions">
+                <button id="candidate-md-generate">Generate Markdown</button>
+                <button id="candidate-md-copy">Copy Markdown</button>
+              </div>
+              <textarea
+                id="candidate-md-output"
+                readonly
+                placeholder="Markdown output appears here for copy/export."
+              ></textarea>
             </div>
           </div>
         </db-panel>
@@ -509,6 +615,8 @@
         personas: [],
         personaAssignments: {},
         lastUiMetricAt: 0,
+        currentCandidateDetail: null,
+        currentCandidateMarkdown: "",
       };
 
       const num = (v) => Number(v || 0);
@@ -698,8 +806,8 @@
         const config = d.config_diff || {};
         const metrics = d.metrics_diff || {};
         const changed = Number(config.changed_count || 0);
-        const changedKeys = Object.keys(config.changed || {}).slice(0, 5);
-        const metricKeys = Object.keys(metrics).slice(0, 5);
+        const changedKeys = Object.keys(config.changed || {});
+        const metricKeys = Object.keys(metrics);
 
         document.getElementById("delta-base").textContent =
           d.base_run_id ? `Compared with ${d.base_run_id}` : "No baseline run available yet.";
@@ -793,7 +901,7 @@
         const plainMatches = source.match(/https?:\/\/[^\s<>"]+/gi) || [];
         plainMatches.forEach((u) => links.add(u));
         if (canonicalUrl) links.add(canonicalUrl);
-        return Array.from(links).slice(0, 6);
+        return Array.from(links);
       }
 
       function computePostMetadata(c, social, detail) {
@@ -964,6 +1072,151 @@
         }
       }
 
+      function parseJsonObject(raw) {
+        if (!raw) return {};
+        if (raw && typeof raw === "object" && !Array.isArray(raw)) return raw;
+        try {
+          const obj = JSON.parse(raw);
+          return obj && typeof obj === "object" && !Array.isArray(obj) ? obj : {};
+        } catch {
+          return {};
+        }
+      }
+
+      function normalizeEvidenceBrief(brief) {
+        const strategy = String(brief.outline_strategy || "explainer").trim();
+        const pattern = String(brief.dominant_pattern || "unknown").trim();
+        const topClaims = Array.isArray(brief.top_claims)
+          ? brief.top_claims.filter((x) => typeof x === "string" && x.trim())
+          : [];
+        const stances = brief.stance_breakdown || {};
+        const evidenceTypes = brief.evidence_type_counts || {};
+        const sourceCount = Number(brief.source_count || 0);
+        return {
+          strategy,
+          pattern,
+          topClaims,
+          stances,
+          evidenceTypes,
+          sourceCount,
+        };
+      }
+
+      function buildOutlineGuidance(normalized) {
+        const byStrategy = {
+          analysis: [
+            "Lead with the core question and explicitly compare competing viewpoints.",
+            "Dedicate one section to contradictions and where evidence conflicts.",
+            "End with a decision framework tied to evidence confidence.",
+          ],
+          "implementation-guide": [
+            "Use a concrete sequence: problem, steps, pitfalls, rollout checks.",
+            "Attach each step to one supporting claim or source cluster.",
+            "Close with operational checklist items that are directly testable.",
+          ],
+          caution: [
+            "Start with uncertainty boundaries and potential failure modes.",
+            "Separate confirmed facts from assumptions before recommendations.",
+            "Reserve action items for low-regret moves only.",
+          ],
+          explainer: [
+            "Start with plain-language framing of why this matters now.",
+            "Progress from concept to implications using evidence-backed examples.",
+            "Close with practical takeaways and open questions to monitor.",
+          ],
+        };
+        const guidance = byStrategy[normalized.strategy] || byStrategy.explainer;
+        if (normalized.pattern === "contested") {
+          guidance.push("Include a dedicated reconciliation section for conflicting evidence.");
+        } else if (normalized.pattern === "data-backed") {
+          guidance.push("Prioritize quantified claims before anecdotal context.");
+        }
+        return guidance;
+      }
+
+      function renderEvidenceBrief(editorial, claims) {
+        const briefRaw = parseJsonObject(editorial.evidence_brief_json);
+        const brief = normalizeEvidenceBrief(briefRaw);
+        const fallbackClaims = (claims || [])
+          .map((c) => String(c.headline || "").trim())
+          .filter(Boolean);
+        const claimAnchors = brief.topClaims.length ? brief.topClaims : fallbackClaims;
+        const evidenceTypeSummary = Object.entries(brief.evidenceTypes)
+          .filter(([, count]) => Number(count) > 0)
+          .map(([name, count]) => `${name}:${count}`)
+          .join(", ");
+        const stanceSummary = Object.entries(brief.stances)
+          .filter(([, count]) => Number(count) > 0)
+          .map(([name, count]) => `${name}:${count}`)
+          .join(", ");
+        const summaryParts = [
+          `Strategy ${brief.strategy}`,
+          `Pattern ${brief.pattern}`,
+          brief.sourceCount ? `${brief.sourceCount} validated sources` : "source count unavailable",
+        ];
+        if (evidenceTypeSummary) summaryParts.push(`Evidence mix ${evidenceTypeSummary}`);
+        if (stanceSummary) summaryParts.push(`Stance mix ${stanceSummary}`);
+        document.getElementById("evidence-brief-summary").textContent = `${summaryParts.join(" | ")}.`;
+        document.getElementById("evidence-strategy").textContent =
+          brief.strategy || "explainer";
+        document.getElementById("evidence-pattern").textContent = brief.pattern || "unknown";
+
+        document.getElementById("evidence-top-claims").innerHTML = (claimAnchors.length
+          ? claimAnchors
+          : ["No claim anchors extracted for this topic yet."])
+          .map((item) => `<li>${item}</li>`)
+          .join("");
+
+        const guidance = buildOutlineGuidance(brief);
+        document.getElementById("evidence-outline-guidance").innerHTML = guidance
+          .map((item) => `<li>${item}</li>`)
+          .join("");
+      }
+
+      function toCredibilityScore(value) {
+        const v = String(value || "").toLowerCase();
+        if (v === "high") return 3;
+        if (v === "medium") return 2;
+        if (v === "low") return 1;
+        return 0;
+      }
+
+      function formatSourceContext(s) {
+        const stance = String(s.stance || "neutral");
+        const credibility = String(s.credibility_guess || "unknown");
+        return `
+          <li class="evidence-source-item">
+            <div class="row">
+              <a href="${s.url}" target="_blank">${s.domain || s.url}</a>
+              <span class="small">${s.topic_label || s.topic_slug || s.topic_id || ""}</span>
+            </div>
+            <div class="meta">
+              <span class="${badgeClass(credibility === "high" ? "high" : credibility === "low" ? "low" : "medium")}">${credibility}</span>
+              <span class="${badgeClass(stance === "contradicts" ? "low" : stance === "supports" ? "high" : "medium")}">${stance}</span>
+            </div>
+          </li>`;
+      }
+
+      function renderDetailEvidenceSources(detail, topicId, topicSlug) {
+        const all = Array.isArray(detail.sources) ? detail.sources : [];
+        const scoped = all
+          .filter((s) => Number(s.fetched_ok) === 1)
+          .filter((s) => {
+            if (topicId) return s.topic_id === topicId;
+            if (topicSlug) return String(s.topic_slug || "") === topicSlug;
+            return true;
+          })
+          .sort((a, b) => {
+            const byCred = toCredibilityScore(b.credibility_guess) - toCredibilityScore(a.credibility_guess);
+            if (byCred !== 0) return byCred;
+            return String(a.domain || "").localeCompare(String(b.domain || ""));
+          });
+        document.getElementById("detail-evidence-sources").innerHTML = (scoped.length
+          ? scoped.map(formatSourceContext)
+          : ['<li class="small">No validated fetched sources available for this topic yet.</li>'])
+          .join("");
+      }
+
       function loadPersonaStore() {
         try {
           const personas = JSON.parse(localStorage.getItem("dailyBlogPersonas") || "[]");
@@ -1011,11 +1264,236 @@
         text = text.replace(/<!--\s*SC_OFF\s*-->/gi, "");
         text = text.replace(/<!--\s*SC_ON\s*-->/gi, "");
         text = htmlToText(text);
-        text = text.replace(/\bsubmitted by\b.*$/i, "").trim();
-        if (text.length > 1200) {
-          text = `${text.slice(0, 1200)}...`;
+        return text.trim();
+      }
+
+      function escapeMdCell(value) {
+        return String(value == null ? "" : value)
+          .replace(/\|/g, "\\|")
+          .replace(/\n/g, " ")
+          .trim();
+      }
+
+      function yamlScalar(value) {
+        const raw = String(value == null ? "" : value);
+        return JSON.stringify(raw);
+      }
+
+      function quoteMdBlock(raw) {
+        const text = String(raw || "").trim();
+        if (!text) return "> _No summary available._";
+        return text
+          .split("\n")
+          .map((line) => `> ${line}`)
+          .join("\n");
+      }
+
+      function toBulletList(items, fallbackText) {
+        const rows = Array.isArray(items)
+          ? items.filter((x) => typeof x === "string" && x.trim())
+          : [];
+        if (!rows.length) {
+          return `- ${fallbackText}`;
         }
-        return text;
+        return rows.map((x) => `- ${x}`).join("\n");
+      }
+
+      function buildCandidateDiscussionMarkdown(bundle) {
+        const c = bundle.candidate || {};
+        const topic = bundle.topic || {};
+        const claim = bundle.claim || {};
+        const claims = Array.isArray(bundle.claims) ? bundle.claims : [];
+        const editorial = bundle.editorial || {};
+        const brief = parseJsonObject(editorial.evidence_brief_json);
+        const sources = Array.isArray(bundle.sources) ? bundle.sources : [];
+        const titles = parseJsonArray(editorial.title_options_json);
+        const checklist = parseJsonArray(editorial.verification_checklist_json);
+        const reasons = parseJsonArray(editorial.evidence_reasons_json);
+        const contextLinks = Array.isArray(bundle.contextLinks) ? bundle.contextLinks : [];
+        const social = bundle.social || {};
+        const generatedAt = new Date().toISOString();
+        const evidenceStatus = String(editorial.evidence_status || "WARN");
+        const evidenceUiState = String(editorial.evidence_ui_state || evidenceStatus);
+        const sourceRows = sources
+          .map(
+            (s) =>
+              `| ${escapeMdCell(s.domain || "")} | ${escapeMdCell(
+                s.credibility_guess || "unknown"
+              )} | ${escapeMdCell(s.stance || "neutral")} | ${
+                Number(s.fetched_ok) === 1 ? "yes" : "no"
+              } | ${escapeMdCell(s.url || "")} |`
+          )
+          .join("\n");
+        const claimRows = claims
+          .map(
+            (row, idx) =>
+              `| ${idx + 1} | ${escapeMdCell(row.headline || "")} | ${escapeMdCell(
+                row.problem_pressure || ""
+              )} | ${escapeMdCell(row.proposed_solution || "")} | ${escapeMdCell(
+                row.evidence_type || ""
+              )} |`
+          )
+          .join("\n");
+        const socialSummary =
+          typeof social.score === "number" || typeof social.num_comments === "number"
+            ? `score=${social.score ?? "n/a"}, comments=${social.num_comments ?? "n/a"}, upvote_ratio=${
+                typeof social.upvote_ratio === "number"
+                  ? `${(social.upvote_ratio * 100).toFixed(0)}%`
+                  : "n/a"
+              }`
+            : "unavailable";
+
+        return [
+          "---",
+          `title: ${yamlScalar(c.title || "(untitled candidate)")}`,
+          `run_id: ${yamlScalar(state.latestRunId || "")}`,
+          `entry_id: ${yamlScalar(c.entry_id || "")}`,
+          `topic_slug: ${yamlScalar(c.topic || "")}`,
+          `topic_id: ${yamlScalar(topic.topic_id || "")}`,
+          `topic_label: ${yamlScalar(topic.parent_topic_label || "")}`,
+          `candidate_rank: ${yamlScalar(c.rank_index || "")}`,
+          `final_score: ${yamlScalar(num(c.final_score).toFixed(3))}`,
+          `novelty_status: ${yamlScalar(c.novelty_status || "")}`,
+          `evidence_status: ${yamlScalar(evidenceStatus)}`,
+          `evidence_ui_state: ${yamlScalar(evidenceUiState)}`,
+          `generated_at: ${yamlScalar(generatedAt)}`,
+          "---",
+          "",
+          "# Candidate Discussion Dossier",
+          "",
+          "## Executive Summary",
+          "",
+          quoteMdBlock(cleanCandidateSummary(c.summary)),
+          "",
+          "## Candidate Metadata",
+          "",
+          "| Field | Value |",
+          "| --- | --- |",
+          `| Title | ${escapeMdCell(c.title || "(untitled)")} |`,
+          `| Source | ${escapeMdCell(c.source || "")} |`,
+          `| URL | ${escapeMdCell(c.url || "")} |`,
+          `| Published | ${escapeMdCell(formatIso(c.published))} |`,
+          `| Topic | ${escapeMdCell(c.topic || "")} |`,
+          `| Topic Label | ${escapeMdCell(topic.parent_topic_label || "")} |`,
+          `| Why It Matters | ${escapeMdCell(topic.why_it_matters || "")} |`,
+          `| Time Horizon | ${escapeMdCell(topic.time_horizon || "")} |`,
+          `| Social | ${escapeMdCell(socialSummary)} |`,
+          "",
+          "## Scoring Breakdown",
+          "",
+          "| Dimension | Score |",
+          "| --- | ---: |",
+          `| Final | ${num(c.final_score).toFixed(3)} |`,
+          `| Novelty | ${num(c.novelty_score).toFixed(3)} |`,
+          `| Recency | ${num(c.recency_score).toFixed(3)} |`,
+          `| Corroboration | ${num(c.corroboration_score).toFixed(3)} |`,
+          `| Source Diversity | ${num(c.source_diversity_score).toFixed(3)} |`,
+          `| Actionability | ${num(c.actionability_score).toFixed(3)} |`,
+          "",
+          "## Evidence Gate",
+          "",
+          `- Status: **${evidenceStatus}** (${evidenceUiState})`,
+          `- Reasons: ${reasons.length ? reasons.join("; ") : "none provided"}`,
+          `- Editorial route: ${editorial.model_route_used || "unknown"}`,
+          "",
+          "## Evidence Brief (Strategy Signal)",
+          "",
+          "| Signal | Value |",
+          "| --- | --- |",
+          `| Outline strategy | ${escapeMdCell(brief.outline_strategy || "explainer")} |`,
+          `| Dominant pattern | ${escapeMdCell(brief.dominant_pattern || "unknown")} |`,
+          `| Source count | ${escapeMdCell(brief.source_count || "")} |`,
+          `| Evidence types | ${escapeMdCell(JSON.stringify(brief.evidence_type_counts || {}))} |`,
+          `| Stance breakdown | ${escapeMdCell(JSON.stringify(brief.stance_breakdown || {}))} |`,
+          "",
+          "### Claim Anchors",
+          toBulletList(brief.top_claims || claims.map((x) => x.headline), "No claim anchors extracted."),
+          "",
+          "### Problem Pressures",
+          toBulletList(brief.problem_pressures, claim.problem_pressure || "No pressure extracted."),
+          "",
+          "### Proposed Solutions",
+          toBulletList(brief.proposed_solutions, claim.proposed_solution || "No solution extracted."),
+          "",
+          "## Claims Table",
+          "",
+          "| # | Headline | Problem Pressure | Proposed Solution | Evidence Type |",
+          "| ---: | --- | --- | --- | --- |",
+          claimRows || "| 1 | _No claims mapped_ |  |  |  |",
+          "",
+          "## Validated Evidence Sources",
+          "",
+          "| Domain | Credibility | Stance | Fetched | URL |",
+          "| --- | --- | --- | --- | --- |",
+          sourceRows || "| _none_ |  |  |  |  |",
+          "",
+          "## Context Links",
+          "",
+          toBulletList(contextLinks, "No links detected."),
+          "",
+          "## Suggested Titles",
+          "",
+          toBulletList(titles, "No generated titles."),
+          "",
+          "## Verification Checklist",
+          "",
+          toBulletList(checklist, "No checklist available."),
+          "",
+          "## Outline Markdown",
+          "",
+          "```markdown",
+          String(editorial.outline_markdown || "No outline available."),
+          "```",
+          "",
+          "## Narrative Draft Markdown",
+          "",
+          "```markdown",
+          String(editorial.narrative_draft_markdown || "No narrative draft available."),
+          "```",
+          "",
+        ].join("\n");
+      }
+
+      function setMarkdownStatus(message) {
+        document.getElementById("candidate-md-status").textContent = message;
+      }
+
+      function renderCandidateMarkdown(bundle) {
+        const md = buildCandidateDiscussionMarkdown(bundle);
+        state.currentCandidateMarkdown = md;
+        document.getElementById("candidate-md-output").value = md;
+        setMarkdownStatus("Markdown generated. Use Copy Markdown to copy to clipboard.");
+      }
+
+      async function copyCandidateMarkdown() {
+        const box = document.getElementById("candidate-md-output");
+        const text = box.value || state.currentCandidateMarkdown || "";
+        if (!text.trim()) {
+          setMarkdownStatus("No markdown generated yet. Click Generate Markdown first.");
+          return;
+        }
+        if (navigator.clipboard && window.isSecureContext) {
+          try {
+            await navigator.clipboard.writeText(text);
+            setMarkdownStatus("Copied to clipboard via browser API.");
+            return;
+          } catch {
+            // fall through to manual copy fallback
+          }
+        }
+        box.focus();
+        box.select();
+        box.setSelectionRange(0, box.value.length);
+        try {
+          const ok = document.execCommand("copy");
+          if (ok) {
+            setMarkdownStatus("Copied using fallback selection copy.");
+            return;
+          }
+        } catch {
+          // manual fallback below
+        }
+        setMarkdownStatus("Clipboard blocked by browser. Text is selected; use Cmd/Ctrl+C to copy.");
       }
 
       async function loadCandidateDetail(entryId) {
@@ -1027,12 +1505,22 @@
         if (!c) {
           document.getElementById("evidence-gate").hidden = true;
           document.getElementById("detail-empty").textContent = "No detail available for selected candidate.";
+          state.currentCandidateDetail = null;
+          state.currentCandidateMarkdown = "";
+          document.getElementById("candidate-md-output").value = "";
+          setMarkdownStatus("No candidate detail available.");
           return;
         }
 
         const claim = (detail.claims || [])[0] || {};
         const topic = (detail.topics || [])[0] || {};
-        const editorial = (detail.editorial || [])[0] || {};
+        const topicId = String(topic.topic_id || "");
+        const topicSlug = String(topic.parent_topic_slug || c.topic || "");
+        const editorialRows = Array.isArray(detail.editorial) ? detail.editorial : [];
+        const editorial =
+          editorialRows.find((row) => String(row.topic_id || "") === topicId) ||
+          editorialRows[0] ||
+          {};
 
         const social = detail.social || {};
         const socialParts = [];
@@ -1054,6 +1542,7 @@
           cleanCandidateSummary(c.summary) || "No summary available.";
 
         renderEvidenceGate(editorial);
+        renderEvidenceBrief(editorial, detail.claims || []);
 
         const contextLinks = extractContextLinks(c.summary || "", c.url || "");
         document.getElementById("context-links").innerHTML = contextLinks.length
@@ -1087,8 +1576,23 @@
         document.getElementById("editorial-narrative").textContent =
           editorial.narrative_draft_markdown || "No narrative draft available for this candidate/topic.";
 
-        const contextTopicId = topic.topic_id || "";
-        const contextTopicSlug = topic.parent_topic_slug || c.topic || "";
+        renderDetailEvidenceSources(detail, topicId, topicSlug);
+
+        state.currentCandidateDetail = {
+          detail,
+          candidate: c,
+          topic,
+          claim,
+          claims: detail.claims || [],
+          editorial,
+          social,
+          metadata,
+          contextLinks,
+        };
+        renderCandidateMarkdown(state.currentCandidateDetail);
+
+        const contextTopicId = topicId;
+        const contextTopicSlug = topicSlug;
         const contextTopicLabel = topic.parent_topic_label || topicLabelForSlug(contextTopicSlug);
         setContextTopic(contextTopicId, contextTopicSlug, contextTopicLabel);
 
@@ -1123,6 +1627,10 @@
           await loadCandidateDetail(state.selectedEntryId);
         } else if (state.candidates.length === 0) {
           document.getElementById("evidence-gate").hidden = true;
+          state.currentCandidateDetail = null;
+          state.currentCandidateMarkdown = "";
+          document.getElementById("candidate-md-output").value = "";
+          setMarkdownStatus("No candidates available for markdown export.");
         }
       }
 
@@ -1263,6 +1771,10 @@
           document.getElementById("detail").style.display = "none";
           document.getElementById("detail-empty").textContent =
             `Could not load candidate detail. ${err.message}`;
+          state.currentCandidateDetail = null;
+          state.currentCandidateMarkdown = "";
+          document.getElementById("candidate-md-output").value = "";
+          setMarkdownStatus("Candidate load failed; markdown unavailable.");
         }
       });
 
@@ -1278,6 +1790,18 @@
         document.getElementById("persona-current").textContent = raw;
         document.getElementById("persona-note").textContent =
           `${state.personas.length} curated personas. Assigned for selected candidate.`;
+      });
+
+      document.getElementById("candidate-md-generate").addEventListener("click", () => {
+        if (!state.currentCandidateDetail) {
+          setMarkdownStatus("Select a candidate first.");
+          return;
+        }
+        renderCandidateMarkdown(state.currentCandidateDetail);
+      });
+
+      document.getElementById("candidate-md-copy").addEventListener("click", () => {
+        copyCandidateMarkdown();
       });
 
       document.getElementById("run-now").addEventListener("click", async () => {
@@ -1296,6 +1820,10 @@
         document.getElementById("detail").style.display = "none";
         document.getElementById("detail-empty").textContent =
           "Dashboard failed to initialize. If you recently updated code, restart insights server.";
+        state.currentCandidateDetail = null;
+        state.currentCandidateMarkdown = "";
+        document.getElementById("candidate-md-output").value = "";
+        setMarkdownStatus("Dashboard init failed; markdown export unavailable.");
       });
 
       setInterval(pollRunStatus, 2000);

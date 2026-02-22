@@ -4,23 +4,23 @@
     "fallback": "gemini:gemini-2.0-flash"
   },
   "extractor": {
-    "primary": "ollama:qwen2.5:14b",
-    "fallback": "ollama:qwen2.5:7b"
+    "primary": "ollama:llama3.2:latest",
+    "fallback": "ollama:llama3.1:8b"
   },
   "topic_lifter": {
-    "primary": "ollama:qwen2.5:14b",
+    "primary": "ollama:llama3.2:latest",
     "fallback": "ollama:llama3.1:8b"
   },
   "topic_curator": {
-    "primary": "ollama:qwen2.5:7b",
+    "primary": "ollama:llama3.2:latest",
     "fallback": "ollama:llama3.1:8b"
   },
   "evidence_synthesis": {
     "primary": "gemini:gemini-2.0-flash",
-    "fallback": "ollama:qwen2.5:14b"
+    "fallback": "ollama:llama3.2:latest"
   },
   "enrichment": {
-    "primary": "ollama:qwen2.5:14b",
+    "primary": "ollama:llama3.2:latest",
     "fallback": "ollama:llama3.1:8b"
   },
   "editorial": {

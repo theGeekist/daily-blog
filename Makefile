@@ -1,4 +1,4 @@
-.PHONY: setup test lint typecheck run clean soak-test help
+.PHONY: setup test test-fast test-slow lint typecheck run clean soak-test help
 
 VENV = .venv
 PYTHON = $(VENV)/bin/python3
@@ -19,6 +19,12 @@ setup: ## Create virtual environment and install dependencies
 
 test: ## Run unit/integration tests
 	$(PYTHON) -m unittest discover -s tests -v
+
+test-fast: ## Run fast test suite
+	$(PYTHON) tests/run_suites.py fast
+
+test-slow: ## Run slow test suite
+	$(PYTHON) tests/run_suites.py slow
 
 lint: ## Run ruff linter
 	$(RUFF) check .

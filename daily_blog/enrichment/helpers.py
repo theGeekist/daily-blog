@@ -2,28 +2,41 @@ import json
 import urllib.parse
 
 
-def credibility_for_domain(domain: str) -> str:
-    medium = {
+def credibility_for_domain(domain: str, url: str = "") -> str:
+    high = {
+        # Academic & standards
+        "nature.com", "science.org", "nejm.org", "acm.org", "ieee.org",
+        # Pre-print & primary research
         "arxiv.org",
+        # Tech primary sources
+        "research.google", "ai.meta.com", "openai.com", "anthropic.com",
+        "huggingface.co",
+        # Tech journalism (primary reporting)
+        "techcrunch.com", "arstechnica.com", "wired.com", "thenextweb.com",
+        # Standards & documentation
+        "developer.mozilla.org", "docs.python.org", "nodejs.org",
+        # Business primary sources
+        "wsj.com", "ft.com", "bloomberg.com",
+        # Open source governance
+        "github.blog", "about.gitlab.com",
+    }
+    medium = {
         "github.com",
-        "docs.python.org",
         "reddit.com",
         "wikipedia.org",
         "stackexchange.com",
     }
-    high = {
-        "nature.com",
-        "science.org",
-        "nejm.org",
-        "acm.org",
-        "ieee.org",
-    }
     if domain in high:
+        return "high"
+    if domain.endswith(".edu") or domain.endswith(".gov"):
+        return "high"
+    # URL-path upgrade: primary research or documentation paths on any domain
+    if url and any(
+        seg in url for seg in ("/papers/", "/research/", "/publications/", "/docs/")
+    ):
         return "high"
     if domain in medium:
         return "medium"
-    if domain.endswith(".edu") or domain.endswith(".gov"):
-        return "high"
     if domain.endswith(".org"):
         return "medium"
     return "low"

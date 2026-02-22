@@ -15,6 +15,14 @@ repos:
       - id: basedpyright
         additional_dependencies: []
 
+  - repo: local
+    hooks:
+      - id: unittest-fast-suite
+        name: unittest fast suite (.venv)
+        entry: bash -lc 'test -x .venv/bin/python || { echo "Missing .venv. Run: make setup"; exit 1; }; .venv/bin/python tests/run_suites.py precommit'
+        language: system
+        pass_filenames: false
+
 # Exclude common generated and cache directories
 exclude: |
   (?x)(

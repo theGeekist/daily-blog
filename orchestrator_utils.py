@@ -26,11 +26,17 @@ class ModelOutputValidationError(ModelCallError):
 
 
 def call_model(stage_name: str, prompt: str, schema: dict | None = None) -> dict[str, Any]:
-    routing = _load_model_routing(DEFAULT_MODEL_ROUTING_PATH)
-    prompt = _apply_prompt_overrides(stage_name=stage_name, prompt=prompt)
+    routing_path = Path(os.getenv("MODEL_ROUTING_CONFIG", str(DEFAULT_MODEL_ROUTING_PATH)))
+    prompts_path = Path(os.getenv("PROMPTS_CONFIG", str(DEFAULT_PROMPTS_PATH)))
+    routing = _load_model_routing(routing_path)
+    prompt = _apply_prompt_overrides(
+        stage_name=stage_name,
+        prompt=prompt,
+        prompts_path=prompts_path,
+    )
     stage_config = routing.get(stage_name)
     if not isinstance(stage_config, dict):
-        raise ModelCallError(f"Stage '{stage_name}' not found in {DEFAULT_MODEL_ROUTING_PATH}")
+        raise ModelCallError(f"Stage '{stage_name}' not found in {routing_path}")
 
     primary = stage_config.get("primary")
     fallback = stage_config.get("fallback")
@@ -157,32 +163,55 @@ def _dispatch_ollama(model_name: str, prompt: str, schema: dict | None) -> str:
 
 def _dispatch_gemini(model_name: str, prompt: str, schema: dict | None) -> str:
     try:
-        import google.generativeai as genai
+        from google import genai
+        from google.genai import types
     except ImportError as exc:
         raise ModelCallError(
-            "Missing dependency 'google-generativeai'. "
+            "Missing dependency 'google-genai'. "
             "Install project dependencies for Gemini routes."
         ) from exc
 
-    api_key = os.getenv("GOOGLE_API_KEY", "").strip()
-    if not api_key:
-        raise ModelCallError("GOOGLE_API_KEY is required for gemini provider routes")
+    use_vertex = os.getenv("GOOGLE_GENAI_USE_VERTEXAI", "0") == "1"
+    if use_vertex:
+        project = os.getenv("GOOGLE_CLOUD_PROJECT", "").strip()
+        if not project:
+            raise ModelCallError(
+                "GOOGLE_CLOUD_PROJECT is required when GOOGLE_GENAI_USE_VERTEXAI=1"
+            )
+        location = os.getenv("GOOGLE_CLOUD_LOCATION", "").strip() or "us-central1"
+        client = genai.Client(vertexai=True, project=project, location=location)
+        logger.debug(
+            "Using Vertex AI ADC for Gemini route '%s' (project=%s, location=%s)",
+            model_name, project, location,
+        )
+    else:
+        api_key = os.getenv("GOOGLE_API_KEY", "").strip()
+        if not api_key:
+            raise ModelCallError(
+                "GOOGLE_API_KEY is required for gemini routes "
+                "(or set GOOGLE_GENAI_USE_VERTEXAI=1 to use Vertex AI ADC)"
+            )
+        client = genai.Client(api_key=api_key)
 
     provider, model_id = _parse_model_ref(model_name)
     if provider != "gemini":
         raise ModelCallError(f"Invalid gemini model route '{model_name}'")
 
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel(model_id)
-    generation_config: dict[str, Any] = {}
+    generation_config: types.GenerateContentConfig | None = None
     if schema:
-        generation_config = {
-            "response_mime_type": "application/json",
-            "response_schema": schema,
-        }
+        sanitized_schema = _sanitize_gemini_schema(schema)
+        logger.debug("Sending sanitized schema to Gemini: %s", sanitized_schema)
+        generation_config = types.GenerateContentConfig(
+            response_mime_type="application/json",
+            response_schema=sanitized_schema,
+        )
 
     try:
-        resp = model.generate_content(prompt, generation_config=generation_config or None)
+        resp = client.models.generate_content(
+            model=model_id,
+            contents=prompt,
+            config=generation_config,
+        )
     except Exception as exc:  # noqa: BLE001
         raise ModelCallError(f"Gemini SDK call failed for model '{model_name}': {exc}") from exc
 
@@ -190,6 +219,20 @@ def _dispatch_gemini(model_name: str, prompt: str, schema: dict | None) -> str:
     if not content:
         raise ModelCallError(f"Gemini returned empty output for model '{model_name}'")
     return content
+
+
+def _sanitize_gemini_schema(value: Any) -> Any:
+    if isinstance(value, dict):
+        cleaned: dict[str, Any] = {}
+        for key, child in value.items():
+            # Gemini schema support is strict; strip pydantic decoration keys.
+            if key in {"title", "examples", "default"}:
+                continue
+            cleaned[key] = _sanitize_gemini_schema(child)
+        return cleaned
+    if isinstance(value, list):
+        return [_sanitize_gemini_schema(item) for item in value]
+    return value
 
 
 def _dispatch_opencode(model_name: str, prompt: str, schema: dict | None) -> str:
@@ -272,8 +315,8 @@ def _load_prompt_overrides(config_path: Path) -> dict[str, Any]:
     return loaded if isinstance(loaded, dict) else {}
 
 
-def _apply_prompt_overrides(stage_name: str, prompt: str) -> str:
-    prompts = _load_prompt_overrides(DEFAULT_PROMPTS_PATH)
+def _apply_prompt_overrides(stage_name: str, prompt: str, prompts_path: Path | None = None) -> str:
+    prompts = _load_prompt_overrides(prompts_path or DEFAULT_PROMPTS_PATH)
     stage = prompts.get(stage_name)
     if not isinstance(stage, dict):
         return prompt
@@ -294,7 +337,7 @@ def _apply_prompt_overrides(stage_name: str, prompt: str) -> str:
 def _extract_json_payload(text: str) -> Any:
     fenced = re.search(r"```(?:json)?\s*(\{.*?\}|\[.*?\])\s*```", text, flags=re.DOTALL)
     if fenced:
-        return json.loads(fenced.group(1))
+        return _unwrap_single_object_array(json.loads(fenced.group(1)))
 
     decoder = JSONDecoder()
     for idx, char in enumerate(text):
@@ -302,11 +345,19 @@ def _extract_json_payload(text: str) -> Any:
             continue
         try:
             value, _ = decoder.raw_decode(text[idx:])
-            return value
+            return _unwrap_single_object_array(value)
         except JSONDecodeError:
             continue
 
     raise ModelOutputValidationError("No valid JSON object/array found in model output")
+
+
+def _unwrap_single_object_array(value: Any) -> Any:
+    """Unwrap ``[{...}]`` → ``{...}`` — opencode and some models wrap output in a single-item array."""
+    if isinstance(value, list) and len(value) == 1 and isinstance(value[0], dict):
+        logger.debug("Unwrapping single-item array from model output")
+        return value[0]
+    return value
 
 
 def _validate_schema(instance: Any, schema: dict[str, Any]) -> None:

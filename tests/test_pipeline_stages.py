@@ -68,11 +68,12 @@ class TestPipelineStages(unittest.TestCase):
             "RULES_ENGINE_CONFIG": str(Path.cwd() / "config" / "rules-engine.json"),
             "TOP_OUTLINES_PATH": str(self.root / "top_outlines.md"),
             "RESEARCH_PACK_PATH": str(self.root / "research_pack.json"),
-            "MODEL_ROUTING_CONFIG": str(Path.cwd() / "config" / "model-routing.json"),
+            "MODEL_ROUTING_CONFIG": str(Path.cwd() / "tests" / "model-routing-fast-fail.json"),
             "ENRICH_SKIP_MODEL": "1",
             "ENRICH_SEARCH_BACKEND": "searxng",
             "SEARXNG_BASE_URL": "http://127.0.0.1:1",
             "EDITORIAL_STATIC_ONLY": "1",
+            "GOOGLE_API_KEY": "",
         }
         proc = subprocess.run(["python3", script], env=env, capture_output=True, text=True)
         self.assertEqual(proc.returncode, 0, msg=proc.stderr + proc.stdout)

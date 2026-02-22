@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import re
 import time
 import urllib.parse
 import urllib.request
@@ -8,6 +9,23 @@ import urllib.request
 from daily_blog.enrichment.helpers import domain_for_url, normalize_url
 
 logger = logging.getLogger(__name__)
+
+_QUERY_STOPWORDS = {
+    "a",
+    "an",
+    "and",
+    "for",
+    "from",
+    "how",
+    "in",
+    "of",
+    "on",
+    "or",
+    "the",
+    "to",
+    "with",
+}
+_GENERIC_TOPIC_WORDS = {"general", "topic", "topics", "engineering", "business", "language"}
 
 
 def verify_source_fetch(url: str, timeout_seconds: int = 8) -> bool:
@@ -77,36 +95,99 @@ def verify_source_fetch(url: str, timeout_seconds: int = 8) -> bool:
 
 def discover_web_sources(topic_label: str, query_terms: list[str], limit: int = 12) -> list[str]:
     backend = os.getenv("ENRICH_SEARCH_BACKEND", "ddgs").strip().lower()
-    query = " ".join([topic_label] + query_terms[:6]).strip()
-    if not query:
+    queries = _build_search_queries(topic_label=topic_label, query_terms=query_terms)
+    if not queries:
         return []
 
-    if backend == "searxng":
-        return _discover_searxng(query=query, limit=limit)
-    return _discover_ddgs(query=query, limit=limit)
+    collected: list[str] = []
+    for query in queries:
+        if backend == "searxng":
+            urls = _discover_searxng(query=query, limit=limit)
+        else:
+            urls = _discover_ddgs(query=query, limit=limit)
+        collected.extend(urls)
+        if len(_dedupe_urls(collected, limit=limit * 2)) >= limit:
+            break
+
+    deduped = _dedupe_urls(collected, limit=limit * 3)
+    return _prioritize_discovered_urls(deduped, limit=limit)
+
+
+def _build_search_queries(
+    topic_label: str,
+    query_terms: list[str],
+    max_queries: int = 4,
+) -> list[str]:
+    label_terms = _normalize_query_tokens(topic_label)
+    explicit_terms = _normalize_query_tokens(" ".join(query_terms[:10]))
+    core_terms = _dedupe_terms(label_terms + explicit_terms)[:8]
+    if not core_terms:
+        return []
+
+    base_query = " ".join(core_terms)
+    queries = [
+        base_query,
+        f"{base_query} official report",
+        f"{base_query} case study",
+        f"{base_query} benchmark data",
+    ]
+    return _dedupe_terms(queries)[:max_queries]
+
+
+def _normalize_query_tokens(text: str) -> list[str]:
+    tokens = re.findall(r"[a-z0-9]{3,}", text.lower())
+    normalized: list[str] = []
+    for token in tokens:
+        if token in _QUERY_STOPWORDS or token in _GENERIC_TOPIC_WORDS:
+            continue
+        normalized.append(token)
+    return normalized
+
+
+def _dedupe_terms(values: list[str]) -> list[str]:
+    out: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        key = value.strip().lower()
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        out.append(value.strip())
+    return out
+
+
+def _prioritize_discovered_urls(urls: list[str], limit: int) -> list[str]:
+    non_reddit: list[str] = []
+    reddit: list[str] = []
+    for url in urls:
+        domain = domain_for_url(url)
+        if domain == "reddit.com" or domain.endswith(".reddit.com"):
+            reddit.append(url)
+        else:
+            non_reddit.append(url)
+    return _dedupe_urls(non_reddit + reddit, limit=limit)
 
 
 def _discover_ddgs(query: str, limit: int) -> list[str]:
     try:
-        from duckduckgo_search import DDGS
+        from ddgs import DDGS
     except ImportError:
-        logger.warning("duckduckgo-search not installed; enrichment search skipped")
+        logger.warning("ddgs not installed; enrichment search skipped")
         return []
 
     extracted_urls: list[str] = []
     try:
-        with DDGS() as ddgs:
-            results = ddgs.text(query, max_results=limit)
-            for row in results:
-                if not isinstance(row, dict):
-                    continue
-                candidate = normalize_url(str(row.get("href", "")))
-                if not candidate:
-                    continue
-                domain = domain_for_url(candidate)
-                if domain.endswith("duckduckgo.com"):
-                    continue
-                extracted_urls.append(candidate)
+        results = DDGS().text(query, max_results=limit)
+        for row in results:
+            if not isinstance(row, dict):
+                continue
+            candidate = normalize_url(str(row.get("href", "")))
+            if not candidate:
+                continue
+            domain = domain_for_url(candidate)
+            if domain.endswith("duckduckgo.com"):
+                continue
+            extracted_urls.append(candidate)
     except Exception:
         logger.warning("DDGS search failed for query=%r", query, exc_info=True)
         return []

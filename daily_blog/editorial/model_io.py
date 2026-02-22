@@ -113,6 +113,7 @@ def build_editorial_prompt(
             ),
             "",
             "Return JSON only. No prose outside JSON.",
+            "Return a single JSON object. Do not wrap the result in an array.",
             "",
             "Topic context:",
             f"- label: {topic_label}",

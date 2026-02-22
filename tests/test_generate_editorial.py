@@ -96,7 +96,9 @@ class TestGenerateEditorial(unittest.TestCase):
             "SQLITE_PATH": str(self.db),
             "TOP_OUTLINES_PATH": str(self.outlines),
             "RESEARCH_PACK_PATH": str(self.research),
-            "MODEL_ROUTING_CONFIG": str(self.routing),
+            "MODEL_ROUTING_CONFIG": str(Path.cwd() / "tests" / "model-routing-fast-fail.json"),
+            "GOOGLE_API_KEY": "",
+            "EDITORIAL_STATIC_ONLY": "1",
         }
         proc = subprocess.run(
             ["python3", "generate_editorial.py"],
@@ -283,10 +285,14 @@ class TestGenerateEditorial(unittest.TestCase):
             "RESEARCH_PACK_PATH": str(self.research),
             "MODEL_ROUTING_CONFIG": str(self.routing),
             "EDITORIAL_STATIC_ONLY": "0",
+            "GOOGLE_API_KEY": "",
         }
 
         with patch.dict(os.environ, env, clear=False), patch(
             "generate_editorial.call_model",
+            side_effect=fake_call_model,
+        ), patch(
+            "daily_blog.editorial.synthesis.call_model",
             side_effect=fake_call_model,
         ):
             rc = generate_editorial.main()
@@ -307,6 +313,91 @@ class TestGenerateEditorial(unittest.TestCase):
         self.assertEqual(model_route_used, "gemini:gemini-2.0-flash")
         brief = json.loads(evidence_brief_json)
         self.assertEqual(brief["outline_strategy"], "implementation-guide")
+
+
+    def test_misc_topic_skipped_by_default(self) -> None:
+        import generate_editorial
+
+        conn = sqlite3.connect(self.db)
+        conn.execute(
+            """
+            INSERT INTO topic_clusters (
+                topic_id, parent_topic_slug, parent_topic_label, why_it_matters,
+                time_horizon, claim_count, keywords_json, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "misc",
+                "misc",
+                "General Engineering",
+                "Uncategorised catch-all",
+                "evergreen",
+                5,
+                "[]",
+                "2026-02-17T08:05:00+00:00",
+            ),
+        )
+        conn.execute(
+            """
+            INSERT INTO enrichment_sources (
+                topic_id, query_terms_json, domain, url, stance,
+                credibility_guess, fetched_ok, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "misc",
+                "[]",
+                "reddit.com",
+                "https://reddit.com/r/misc/1",
+                "neutral",
+                "medium",
+                1,
+                "2026-02-17T08:05:00+00:00",
+            ),
+        )
+        conn.commit()
+        conn.close()
+
+        base_env = {
+            **os.environ,
+            "SQLITE_PATH": str(self.db),
+            "TOP_OUTLINES_PATH": str(self.outlines),
+            "RESEARCH_PACK_PATH": str(self.research),
+            "MODEL_ROUTING_CONFIG": str(Path.cwd() / "tests" / "model-routing-fast-fail.json"),
+            "EDITORIAL_STATIC_ONLY": "1",
+            "GOOGLE_API_KEY": "",
+        }
+
+        # Default: EDITORIAL_INCLUDE_MISC not set → misc skipped
+        with patch.dict(os.environ, {**base_env, "EDITORIAL_INCLUDE_MISC": "0"}, clear=False):
+            rc = generate_editorial.main()
+        self.assertEqual(rc, 0)
+
+        conn = sqlite3.connect(self.db)
+        slugs = {
+            row[0]
+            for row in conn.execute(
+                "SELECT topic_id FROM editorial_candidates"
+            ).fetchall()
+        }
+        conn.close()
+        self.assertNotIn("misc", slugs)
+        self.assertIn("ai", slugs)
+
+        # Opt-in: EDITORIAL_INCLUDE_MISC=1 → misc included
+        with patch.dict(os.environ, {**base_env, "EDITORIAL_INCLUDE_MISC": "1"}, clear=False):
+            rc = generate_editorial.main()
+        self.assertEqual(rc, 0)
+
+        conn = sqlite3.connect(self.db)
+        slugs = {
+            row[0]
+            for row in conn.execute(
+                "SELECT topic_id FROM editorial_candidates"
+            ).fetchall()
+        }
+        conn.close()
+        self.assertIn("misc", slugs)
 
 
 if __name__ == "__main__":

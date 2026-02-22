@@ -80,7 +80,7 @@
     "min_fetched_ratio": 0.5,
     "min_avg_credibility_score": 2.0,
     "warn_min_fetched_ratio": 0.7,
-    "warn_min_avg_credibility_score": 3.0,
+    "warn_min_avg_credibility_score": 2.5,
     "min_domain_diversity": 2,
     "block_anecdote_without_min_sources": true
   },

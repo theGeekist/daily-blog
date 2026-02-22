@@ -111,7 +111,7 @@ def main() -> int:
                 "url": url,
                 "domain": domain,
                 "stance": "neutral",
-                "credibility_guess": credibility_for_domain(domain),
+                "credibility_guess": credibility_for_domain(domain, url),
                 "fetched_ok": 1 if verify_source_fetch(url, timeout_seconds=timeout_seconds) else 0,
             }
             if len(known_sources) >= max_known_claim_urls:
@@ -126,7 +126,7 @@ def main() -> int:
             if discovered in source_map:
                 continue
             domain = domain_for_url(discovered)
-            guessed_credibility = credibility_for_domain(domain)
+            guessed_credibility = credibility_for_domain(domain, discovered)
             if credibility_rank(guessed_credibility) < 2:
                 continue
             source_map[discovered] = {
