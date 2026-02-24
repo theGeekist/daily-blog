@@ -33,6 +33,21 @@ DEFAULT_SQLITE_PATH = "./data/daily-blog.db"
 ENRICHMENT_STAGE = "enrichment"
 
 
+def _coerce_int(value: object, default: int = 0) -> int:
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        try:
+            return int(value.strip())
+        except ValueError:
+            return default
+    return default
+
+
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     load_env_file(Path(".env"))
@@ -216,7 +231,7 @@ def main() -> int:
                 platform=str(receipt.get("platform", "")),
                 query_used=str(receipt.get("query_used", "")),
                 receipt_text=str(receipt.get("receipt_text", "")),
-                comment_count=int(receipt.get("comment_count", 0) or 0),
+                comment_count=_coerce_int(receipt.get("comment_count", 0)),
                 problem_statements_json=problem_json,
                 solution_statements_json=solution_json,
                 model_route_used=discussion_route_used,
