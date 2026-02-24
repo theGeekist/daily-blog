@@ -6,6 +6,7 @@ import time
 from pathlib import Path
 
 from daily_blog.core.env import load_env_file
+from daily_blog.core.env_parsing import env_bool, env_int
 from daily_blog.core.json_utils import load_json_file
 from daily_blog.core.time_utils import now_iso, run_id_now
 from daily_blog.pipeline.definitions import configured_stages
@@ -58,17 +59,6 @@ def _print_pipeline_header(
     print("=" * 78)
 
 
-def _read_int_env(name: str, default: int) -> int:
-    raw = os.getenv(name)
-    if raw is None:
-        return default
-    try:
-        value = int(raw)
-    except ValueError:
-        return default
-    return value if value > 0 else default
-
-
 def _read_stage_skip_set() -> set[str]:
     raw = os.getenv("PIPELINE_SKIP_STAGES", "").strip()
     if not raw:
@@ -83,7 +73,11 @@ def _read_stage_skip_set() -> set[str]:
 
 
 def _load_stage_timeouts(stage_names: list[str]) -> dict[str, int]:
-    default_timeout = _read_int_env("PIPELINE_STAGE_TIMEOUT_SECONDS", DEFAULT_STAGE_TIMEOUT_SECONDS)
+    default_timeout = env_int(
+        "PIPELINE_STAGE_TIMEOUT_SECONDS",
+        DEFAULT_STAGE_TIMEOUT_SECONDS,
+        minimum=1,
+    )
     timeouts = {stage: default_timeout for stage in stage_names}
 
     path = Path(os.getenv("PIPELINE_TIMEOUTS_PATH", str(DEFAULT_PIPELINE_TIMEOUTS_PATH)))
@@ -106,6 +100,65 @@ def _load_stage_timeouts(stage_names: list[str]) -> dict[str, int]:
     return timeouts
 
 
+def _pending_extract_mentions(conn: sqlite3.Connection) -> int:
+    max_mentions = env_int("EXTRACT_MAX_MENTIONS", 300, minimum=1)
+    row = conn.execute(
+        """
+        SELECT COUNT(*)
+        FROM (
+            SELECT m.entry_id
+            FROM mentions m
+            LEFT JOIN claims c ON c.entry_id = m.entry_id
+            WHERE c.entry_id IS NULL
+            ORDER BY m.fetched_at DESC
+            LIMIT ?
+        ) q
+        """,
+        (max_mentions,),
+    ).fetchone()
+    return int((row[0] if row else 0) or 0)
+
+
+def _pending_lift_claims(conn: sqlite3.Connection) -> int:
+    row = conn.execute("SELECT COUNT(*) FROM claims").fetchone()
+    return int((row[0] if row else 0) or 0)
+
+
+def _dynamic_stage_timeout_seconds(
+    *,
+    conn: sqlite3.Connection,
+    stage_name: str,
+    configured_timeout: int,
+) -> tuple[int, str]:
+    if not env_bool("PIPELINE_DYNAMIC_TIMEOUTS", default=True):
+        return configured_timeout, "static"
+
+    max_timeout = env_int("PIPELINE_TIMEOUT_MAX_SECONDS", 7200, minimum=60)
+    buffer_seconds = env_int("PIPELINE_DYNAMIC_TIMEOUT_BUFFER_SECONDS", 90, minimum=0)
+    timeout = configured_timeout
+    detail = "configured"
+
+    try:
+        if stage_name == "extract_claims":
+            pending = _pending_extract_mentions(conn)
+            per_unit = env_int("EXTRACT_TIMEOUT_PER_MENTION_SECONDS", 8, minimum=1)
+            estimated = (pending * per_unit) + buffer_seconds
+            timeout = max(configured_timeout, estimated)
+            detail = f"pending_mentions={pending} per={per_unit}s buffer={buffer_seconds}s"
+        elif stage_name == "lift_topics":
+            pending = _pending_lift_claims(conn)
+            per_unit = env_int("LIFT_TIMEOUT_PER_CLAIM_SECONDS", 9, minimum=1)
+            estimated = (pending * per_unit) + buffer_seconds
+            timeout = max(configured_timeout, estimated)
+            detail = f"pending_claims={pending} per={per_unit}s buffer={buffer_seconds}s"
+    except sqlite3.OperationalError:
+        timeout = configured_timeout
+        detail = "configured (introspection unavailable)"
+
+    timeout = min(timeout, max_timeout)
+    return max(1, timeout), detail
+
+
 def main() -> int:
     load_env_file(Path(".env"))
     sqlite_path = Path(os.getenv("SQLITE_PATH", DEFAULT_SQLITE_PATH))
@@ -115,7 +168,7 @@ def main() -> int:
     init_run_config_tables(conn)
 
     run_id = run_id_now()
-    retries = int(os.getenv("PIPELINE_RETRIES", "2"))
+    retries = env_int("PIPELINE_RETRIES", 2, minimum=1)
     skip_stages = _read_stage_skip_set()
     stages = configured_stages(skip_stages)
 
@@ -147,18 +200,29 @@ def main() -> int:
 
     for index, stage in enumerate(stages, start=1):
         stage_name = stage.name
+        configured_timeout = stage_timeouts.get(stage_name, DEFAULT_STAGE_TIMEOUT_SECONDS)
+        effective_timeout, timeout_detail = _dynamic_stage_timeout_seconds(
+            conn=conn,
+            stage_name=stage_name,
+            configured_timeout=configured_timeout,
+        )
         started = now_iso()
         t0 = time.time()
         print(
             f"\n[{index}/{len(stages)}] START {stage_name} | "
-            f"timeout={stage_timeouts.get(stage_name, DEFAULT_STAGE_TIMEOUT_SECONDS)}s "
+            f"timeout={effective_timeout}s "
             f"| retries={retries}"
         )
+        if effective_timeout != configured_timeout:
+            print(
+                f"[{stage_name}] timeout adjusted from {configured_timeout}s "
+                f"to {effective_timeout}s ({timeout_detail})"
+            )
         ok, out, error_message, route_used, model_used = run_stage(
             stage_name=stage_name,
             command=stage.command,
             retries=retries,
-            timeout_seconds=stage_timeouts.get(stage_name, DEFAULT_STAGE_TIMEOUT_SECONDS),
+            timeout_seconds=effective_timeout,
             routing=model_routing,
             stage_route_key=stage.route_key,
             default_model=stage.default_model,

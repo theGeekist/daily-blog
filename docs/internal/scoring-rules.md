@@ -13,7 +13,7 @@
 
 - Ranked candidates table: `candidate_scores`
 - Canonical memory table: `canonical_items`
-- Daily markdown board: `DAILY_BOARD_PATH` (default `data/daily_board.md`)
+- Daily markdown board: `SCORE_BOARD_PATH` (default `data/daily_board.md`)
 
 ### Run Commands
 

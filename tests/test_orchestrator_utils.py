@@ -10,6 +10,7 @@ from orchestrator_utils import (
     _candidate_models,
     _extract_json_payload,
     _invoke_with_retries,
+    _sanitize_gemini_schema,
 )
 
 
@@ -53,7 +54,7 @@ class TestOrchestratorUtils(unittest.TestCase):
 
     def test_no_retry_for_hard_failure(self) -> None:
         with patch(
-            "orchestrator_utils._dispatch_model",
+            "daily_blog.model_inference.caller._dispatch_model",
             side_effect=ModelCallError("missing key"),
         ) as dispatch:
             with self.assertRaises(ModelCallError):
@@ -72,7 +73,7 @@ class TestOrchestratorUtils(unittest.TestCase):
             del model_name, prompt, schema
             return responses.pop(0)
 
-        with patch("orchestrator_utils._dispatch_model", side_effect=_fake_dispatch) as dispatch:
+        with patch("daily_blog.model_inference.caller._dispatch_model", side_effect=_fake_dispatch) as dispatch:
             parsed = _invoke_with_retries(
                 model_name="opencode:test",
                 prompt="x",
@@ -88,7 +89,7 @@ class TestOrchestratorUtils(unittest.TestCase):
         self.assertEqual(dispatch.call_count, 2)
 
     def test_exhausted_retry_raises_validation_error(self) -> None:
-        with patch("orchestrator_utils._dispatch_model", return_value="not json"):
+        with patch("daily_blog.model_inference.caller._dispatch_model", return_value="not json"):
             with self.assertRaises(ModelOutputValidationError):
                 _invoke_with_retries(
                     model_name="opencode:test",
@@ -113,6 +114,25 @@ class TestOrchestratorUtils(unittest.TestCase):
     def test_extract_json_unwraps_fenced_single_item_array(self) -> None:
         result = _extract_json_payload('```json\n[{"title": "hello"}]\n```')
         self.assertEqual(result, {"title": "hello"})
+
+    def test_sanitize_gemini_schema_removes_additional_properties(self) -> None:
+        raw_schema = {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "topic_id": {"type": "string", "title": "Topic Id"},
+                "nested": {
+                    "type": "object",
+                    "additionalProperties": {"type": "string"},
+                    "properties": {"count": {"type": "integer", "default": 0}},
+                },
+            },
+        }
+        cleaned = _sanitize_gemini_schema(raw_schema)
+        self.assertNotIn("additionalProperties", cleaned)
+        self.assertNotIn("title", cleaned["properties"]["topic_id"])
+        self.assertNotIn("default", cleaned["properties"]["nested"]["properties"]["count"])
+        self.assertNotIn("additionalProperties", cleaned["properties"]["nested"])
 
 
 class TestDispatchGemini(unittest.TestCase):

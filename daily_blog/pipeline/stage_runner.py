@@ -1,61 +1,17 @@
 import os
-import re
 import subprocess
-import threading
 import time
 import traceback
 from typing import Any
 
-
-def _canonical_model_name(model_name: str) -> str:
-    normalized = model_name.strip()
-    if not normalized:
-        return "unknown"
-    if normalized.startswith("opencode:"):
-        return f"opencode/{normalized.split(':', 1)[1]}"
-    if normalized.startswith("openclaw:"):
-        return f"openclaw/{normalized.split(':', 1)[1]}"
-    if normalized.startswith("ollama:"):
-        return f"ollama/{normalized.split(':', 1)[1]}"
-    if ":" in normalized and "/" not in normalized:
-        provider, model = normalized.split(":", 1)
-        if provider and model:
-            return f"{provider}/{model}"
-    if normalized.startswith("openclaw/") or normalized.startswith("opencode/"):
-        return normalized
-    if "/" in normalized:
-        return normalized
-    return f"opencode/{normalized}"
-
-
-def _extract_model_from_output(output: str, fallback_model: str) -> str:
-    if not output:
-        return fallback_model
-
-    keyed = re.search(r'"model_used"\s*:\s*"([^"]+)"', output)
-    if keyed:
-        return _canonical_model_name(keyed.group(1))
-
-    for pattern in (
-        r"\b(?:opencode|openclaw|ollama)/[A-Za-z0-9_.:-]+\b",
-        r"\b(?:opencode|openclaw|ollama):[A-Za-z0-9_.-]+\b",
-        r"\bmodel\s*[=:]\s*([A-Za-z0-9_.:/-]+)",
-    ):
-        match = re.search(pattern, output, flags=re.IGNORECASE)
-        if not match:
-            continue
-        token = match.group(1) if match.groups() else match.group(0)
-        return _canonical_model_name(token)
-
-    return fallback_model
-
-
-def _coerce_text(value: str | bytes | None) -> str:
-    if value is None:
-        return ""
-    if isinstance(value, bytes):
-        return value.decode("utf-8", errors="replace")
-    return value
+from daily_blog.core.tracing import trace_enabled as _trace_enabled, trace_event as _trace_event  # noqa: F401
+from daily_blog.pipeline.subprocess_runner import (
+    _canonical_model_name,
+    _coerce_text,
+    _extract_model_from_output,
+    _run_subprocess_with_heartbeat,
+    _stream_subprocess_output,
+)
 
 
 def _build_error_context(
@@ -125,6 +81,7 @@ def run_stage(
     total_attempts = retries + 1
 
     for attempt in range(1, retries + 2):
+        attempt_started = time.monotonic()
         route_used, routed_model = _resolve_route_for_attempt(
             routing=routing,
             stage_route_key=stage_route_key,
@@ -137,6 +94,16 @@ def run_stage(
             f"[{stage_name}] Attempt {attempt}/{total_attempts} "
             f"route={route_used} model={routed_model} timeout={timeout_seconds}s"
         )
+        _trace_event(
+            "stage_attempt_start",
+            stage=stage_name,
+            attempt=attempt,
+            total_attempts=total_attempts,
+            route=route_used,
+            model=routed_model,
+            timeout_seconds=timeout_seconds,
+            command=command,
+        )
 
         env = os.environ.copy()
         env["RUN_ID"] = run_id
@@ -144,6 +111,9 @@ def run_stage(
         env["MODEL_ROUTE"] = route_used
         env["MODEL_NAME"] = routed_model
         env["MODEL_ROUTING_STAGE"] = stage_route_key
+        env["STAGE_TIMEOUT_SECONDS"] = str(timeout_seconds)
+        env.setdefault("PYTHONUNBUFFERED", "1")
+        env.setdefault("PYTHONIOENCODING", "utf-8")
 
         try:
             proc = _run_subprocess_with_heartbeat(
@@ -168,6 +138,15 @@ def run_stage(
                 stderr=_coerce_text(exc.stderr),
                 exception=exc,
             )
+            _trace_event(
+                "stage_attempt_timeout",
+                stage=stage_name,
+                attempt=attempt,
+                route=route_used,
+                model=routed_model,
+                elapsed_ms=int((time.monotonic() - attempt_started) * 1000),
+                error_type=type(exc).__name__,
+            )
             if attempt <= retries:
                 time.sleep(2**attempt)
             continue
@@ -175,10 +154,19 @@ def run_stage(
         combined_output = "\n".join(
             part.strip() for part in (proc.stdout or "", proc.stderr or "") if part and part.strip()
         )
-        last_output = combined_output
+        returned_output = "" if _stream_subprocess_output() else combined_output
+        last_output = returned_output
         if proc.returncode == 0:
             detected_model = _extract_model_from_output(combined_output, routed_model)
-            return True, combined_output, "", route_used, detected_model
+            _trace_event(
+                "stage_attempt_ok",
+                stage=stage_name,
+                attempt=attempt,
+                route=route_used,
+                model=detected_model,
+                elapsed_ms=int((time.monotonic() - attempt_started) * 1000),
+            )
+            return True, returned_output, "", route_used, detected_model
         last_error = _build_error_context(
             stage_name=stage_name,
             command=command,
@@ -193,55 +181,16 @@ def run_stage(
         )
         if attempt <= retries:
             time.sleep(2**attempt)
+            _trace_event(
+                "stage_attempt_retry_scheduled",
+                stage=stage_name,
+                attempt=attempt,
+                route=route_used,
+                model=routed_model,
+                elapsed_ms=int((time.monotonic() - attempt_started) * 1000),
+            )
     if not last_error:
         last_error = "unknown error"
     if not last_output:
         last_output = last_error
     return False, last_output, last_error, last_route_used, last_model_used
-
-
-def _run_subprocess_with_heartbeat(
-    *,
-    stage_name: str,
-    attempt: int,
-    total_attempts: int,
-    command: list[str],
-    timeout_seconds: int,
-    env: dict[str, str],
-) -> subprocess.CompletedProcess[str]:
-    heartbeat_seconds = 15
-    started = time.time()
-    result: dict[str, Any] = {"proc": None, "error": None}
-
-    def _target() -> None:
-        try:
-            result["proc"] = subprocess.run(
-                command,
-                capture_output=True,
-                text=True,
-                timeout=timeout_seconds,
-                env=env,
-            )
-        except Exception as exc:  # pragma: no cover - exercised via caller behavior
-            result["error"] = exc
-
-    thread = threading.Thread(target=_target, daemon=True)
-    thread.start()
-
-    while thread.is_alive():
-        thread.join(timeout=heartbeat_seconds)
-        if thread.is_alive():
-            elapsed = int(time.time() - started)
-            print(
-                f"[{stage_name}] Attempt {attempt}/{total_attempts} still running... "
-                f"elapsed={elapsed}s"
-            )
-
-    error = result.get("error")
-    if error is not None:
-        raise error
-
-    proc = result.get("proc")
-    if proc is None:  # pragma: no cover - defensive
-        raise RuntimeError("subprocess finished without result")
-    return proc

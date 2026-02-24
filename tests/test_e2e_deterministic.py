@@ -27,9 +27,9 @@ class TestE2EDeterministic(unittest.TestCase):
         env = {
             **os.environ,
             "SQLITE_PATH": str(self.db),
-            "DAILY_BOARD_PATH": str(self.root / "daily_board.md"),
-            "TOP_OUTLINES_PATH": str(self.root / "top_outlines.md"),
-            "RESEARCH_PACK_PATH": str(self.root / "research_pack.json"),
+            "SCORE_BOARD_PATH": str(self.root / "daily_board.md"),
+            "EDITORIAL_OUTLINES_PATH": str(self.root / "top_outlines.md"),
+            "EDITORIAL_RESEARCH_PACK_PATH": str(self.root / "research_pack.json"),
             "MODEL_ROUTING_CONFIG": str(
                 Path(__file__).resolve().parent / "model-routing-fast-fail.json"
             ),

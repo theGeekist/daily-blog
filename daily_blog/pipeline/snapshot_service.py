@@ -12,16 +12,22 @@ def _effective_env_config() -> dict[str, Any]:
         "PIPELINE_RETRIES",
         "PIPELINE_STAGE_TIMEOUT_SECONDS",
         "PIPELINE_STAGE_TIMEOUTS",
+        "PIPELINE_SKIP_STAGES",
         "EXTRACT_MAX_MENTIONS",
         "ENRICH_FETCH_TIMEOUT_SECONDS",
         "ENRICH_FETCH_RETRIES",
         "ENRICH_DISCOVER_LIMIT",
         "ENRICH_MAX_KNOWN_CLAIM_URLS",
         "ENRICH_MAX_TOPICS",
+        "ENRICH_MIN_DOMAIN_DIVERSITY",
+        "ENRICH_MAX_PER_DOMAIN",
+        "ENRICH_MIN_CREDIBLE_COUNT",
         "ENRICH_SKIP_MODEL",
         "TOPIC_CURATOR_BATCH_SIZE",
-        "FORCE_TOPIC_RECURATE",
+        "TOPIC_CONFIDENCE_THRESHOLD",
+        "FORCE_TOPIC_RECURATION",
         "EDITORIAL_STATIC_ONLY",
+        "EDITORIAL_INCLUDE_MISC",
     ]
     return {key: os.getenv(key, "") for key in tracked_keys if key in os.environ}
 

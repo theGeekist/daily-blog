@@ -7,9 +7,10 @@ import sys
 from pathlib import Path
 
 from daily_blog.core.env import load_env_file
+from daily_blog.core.env_parsing import env_bool
 from daily_blog.core.time_utils import now_iso
 from daily_blog.editorial.evidence import compute_evidence_assessment
-from daily_blog.editorial.model_io import (
+from daily_blog.editorial.prompt import (
     EDITORIAL_RESPONSE_SCHEMA,
     EDITORIAL_STAGE,
     build_editorial_prompt,
@@ -79,10 +80,7 @@ def _build_dossier_markdown(dossier: dict) -> str:
             "",
             "## Snapshot",
             f"- Recommendation: **{scoring.get('editorial_recommendation', 'investigate')}**",
-            (
-                f"- Confidence: topic="
-                f"{classification.get('topic_confidence', 0.0):.2f}"
-            ),
+            (f"- Confidence: topic={classification.get('topic_confidence', 0.0):.2f}"),
             f"- Evidence: {evidence.get('status', 'WARN')} ({evidence.get('ui_state', 'unknown')})",
             f"- Why interesting: {editorial.get('why_interesting', 'No summary available.')}",
             "",
@@ -122,8 +120,8 @@ def _build_dossier_markdown(dossier: dict) -> str:
 def main() -> int:
     load_env_file(Path(".env"))
     sqlite_path = Path(os.getenv("SQLITE_PATH", DEFAULT_SQLITE_PATH))
-    outlines_path = Path(os.getenv("TOP_OUTLINES_PATH", DEFAULT_TOP_OUTLINES_PATH))
-    research_path = Path(os.getenv("RESEARCH_PACK_PATH", DEFAULT_RESEARCH_PACK_PATH))
+    outlines_path = Path(os.getenv("EDITORIAL_OUTLINES_PATH", DEFAULT_TOP_OUTLINES_PATH))
+    research_path = Path(os.getenv("EDITORIAL_RESEARCH_PACK_PATH", DEFAULT_RESEARCH_PACK_PATH))
     routing_path = Path(os.getenv("MODEL_ROUTING_CONFIG", DEFAULT_MODEL_ROUTING_PATH))
     rules_path = Path(os.getenv("RULES_ENGINE_CONFIG", DEFAULT_RULES_ENGINE_PATH))
 
@@ -172,7 +170,7 @@ def main() -> int:
             run_id = "manual-run"
     md_lines = ["# Top Outlines", ""]
     research_pack: list[dict] = []
-    dossier_dir = Path(os.getenv("DOSSIER_OUTPUT_DIR", DEFAULT_DOSSIER_DIR)) / _safe_slug(run_id)
+    dossier_dir = Path(os.getenv("EDITORIAL_DOSSIER_DIR", DEFAULT_DOSSIER_DIR)) / _safe_slug(run_id)
     dossier_dir.mkdir(parents=True, exist_ok=True)
 
     try:
@@ -192,7 +190,7 @@ def main() -> int:
             continue
         topic_evidence_types.setdefault(key, set()).add(str(evidence_type or "").strip().lower())
 
-    skip_misc = os.getenv("EDITORIAL_INCLUDE_MISC", "0") != "1"
+    skip_misc = not env_bool("EDITORIAL_INCLUDE_MISC", False)
     generated_count = 0
     for topic_row in topics:
         topic_id = topic_row[0]
@@ -305,7 +303,7 @@ def main() -> int:
             else (0.35 if str(slug) == "misc" else 0.8)
         )
 
-        static_only = os.getenv("EDITORIAL_STATIC_ONLY", "0") == "1"
+        static_only = env_bool("EDITORIAL_STATIC_ONLY", False)
         outline_strategy = str(evidence_brief.get("outline_strategy", "explainer"))
         if bool(assessment.get("output_suppressed")):
             package = blocked_editorial_package(label, why, evidence_reasons)
@@ -396,9 +394,7 @@ def main() -> int:
             4,
         )
         angle_fit_scores = [
-            {"angle": str(t), "score": 0.75}
-            for t in title_options[:3]
-            if str(t).strip()
+            {"angle": str(t), "score": 0.75} for t in title_options[:3] if str(t).strip()
         ]
         if evidence_status == "BLOCK":
             draftability_now = "no"
@@ -531,9 +527,7 @@ def main() -> int:
             publishability_state = "not_evaluated"
 
         top_claims = [
-            str(item).strip()
-            for item in evidence_brief.get("top_claims", [])
-            if str(item).strip()
+            str(item).strip() for item in evidence_brief.get("top_claims", []) if str(item).strip()
         ]
         if not top_claims:
             top_claims = [str(c.get("headline", "")).strip() for c in claims if c.get("headline")]
@@ -721,9 +715,7 @@ def main() -> int:
             ),
         )
         dossier_path = dossier_dir / f"{_safe_slug(entry_id)}.candidate.json"
-        dossier_path.write_text(
-            json.dumps(dossier, ensure_ascii=True, indent=2), encoding="utf-8"
-        )
+        dossier_path.write_text(json.dumps(dossier, ensure_ascii=True, indent=2), encoding="utf-8")
         md_path = dossier_dir / f"{_safe_slug(entry_id)}.candidate.md"
         md_path.write_text(_build_dossier_markdown(dossier), encoding="utf-8")
 

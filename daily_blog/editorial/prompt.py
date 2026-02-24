@@ -3,7 +3,8 @@ import re
 from pathlib import Path
 from typing import Any
 
-from orchestrator_utils import ModelCallError
+from daily_blog.model_inference.config import load_model_routing
+from daily_blog.model_inference.errors import ModelCallError
 
 EDITORIAL_STAGE = "editorial"
 
@@ -40,10 +41,11 @@ EDITORIAL_RESPONSE_SCHEMA: dict[str, Any] = {
 
 
 def load_model_route(path: Path) -> str:
-    if not path.exists():
+    try:
+        routing = load_model_routing(path)
+    except ModelCallError:
         return "codex-5.3"
-    obj = json.loads(path.read_text(encoding="utf-8"))
-    return str(obj.get(EDITORIAL_STAGE, {}).get("primary", "codex-5.3"))
+    return str(routing.get(EDITORIAL_STAGE, {}).get("primary", "codex-5.3"))
 
 
 def load_rules(path: Path) -> dict[str, Any]:

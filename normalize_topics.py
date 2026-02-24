@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from daily_blog.core.env import load_env_file
+from daily_blog.core.env_parsing import env_bool
 from daily_blog.core.time_utils import now_iso
 from orchestrator_utils import ModelCallError, call_model
 
@@ -180,8 +181,8 @@ def main() -> int:
 
     conn = sqlite3.connect(sqlite_path)
     init_topic_curation_columns(conn)
-    force_recurate = os.getenv("FORCE_TOPIC_RECURATE", "0") == "1"
-    where_sql = "" if force_recurate else "WHERE tc.normalized_topic_slug = ''"
+    force_recuration = env_bool("FORCE_TOPIC_RECURATION", False)
+    where_sql = "" if force_recuration else "WHERE tc.normalized_topic_slug = ''"
     rows = conn.execute(
         (
             """

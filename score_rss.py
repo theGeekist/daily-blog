@@ -3,13 +3,13 @@ import json
 import os
 import sqlite3
 import sys
-import urllib.parse
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path
 
 from daily_blog.core.env import load_env_file
+from daily_blog.enrichment.helpers import normalize_url
 
 DEFAULT_SQLITE_PATH = "./data/daily-blog.db"
 DEFAULT_CONFIG_PATH = "./config/rules-engine.json"
@@ -47,21 +47,6 @@ def parse_dt(value: str) -> datetime:
         return dt.astimezone(timezone.utc)
     except ValueError:
         return datetime(1970, 1, 1, tzinfo=timezone.utc)
-
-
-def normalize_url(url: str) -> str:
-    if not url:
-        return ""
-    parsed = urllib.parse.urlparse(url)
-    query = urllib.parse.parse_qsl(parsed.query, keep_blank_values=True)
-    filtered = []
-    for k, v in query:
-        kl = k.lower()
-        if kl.startswith("utm_") or kl in {"fbclid", "gclid", "mc_cid", "mc_eid"}:
-            continue
-        filtered.append((k, v))
-    clean = parsed._replace(query=urllib.parse.urlencode(filtered), fragment="")
-    return urllib.parse.urlunparse(clean)
 
 
 def read_config(path: Path) -> dict:
@@ -384,7 +369,7 @@ def main() -> int:
 
     sqlite_path = Path(os.getenv("SQLITE_PATH", DEFAULT_SQLITE_PATH))
     config_path = Path(os.getenv("RULES_ENGINE_CONFIG", DEFAULT_CONFIG_PATH))
-    board_path = Path(os.getenv("DAILY_BOARD_PATH", DEFAULT_BOARD_PATH))
+    board_path = Path(os.getenv("SCORE_BOARD_PATH", DEFAULT_BOARD_PATH))
 
     try:
         cfg = read_config(config_path)

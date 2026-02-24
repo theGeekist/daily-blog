@@ -4,10 +4,13 @@ import logging
 import os
 import sqlite3
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
 from daily_blog.core.env import load_env_file
+from daily_blog.core.env_parsing import env_bool, env_int
+from daily_blog.core.progress import elapsed_ms, emit_progress
 from daily_blog.core.time_utils import now_iso
 from orchestrator_utils import ModelCallError, call_model
 
@@ -140,6 +143,27 @@ def chunk_claims(claims: list[tuple], batch_size: int) -> list[list[tuple]]:
     if batch_size <= 0:
         return [claims]
     return [claims[idx : idx + batch_size] for idx in range(0, len(claims), batch_size)]
+
+
+def effective_batch_size(default_size: int = MAX_CLAIMS_PER_BATCH) -> int:
+    raw_override = os.getenv("TOPIC_LIFTER_BATCH_SIZE", "").strip()
+    if raw_override:
+        try:
+            parsed = int(raw_override)
+            return parsed if parsed > 0 else 1
+        except ValueError:
+            pass
+
+    model_name = os.getenv("MODEL_NAME", "").strip().lower()
+    # Local Ollama inference is resource-constrained; keep topic_lifter strictly
+    # sequential with one claim per model call by default.
+    if model_name.startswith("ollama/") or model_name.startswith("ollama:"):
+        return 1
+    return default_size
+
+
+def batch_index(idx: int, total_batches: int) -> str:
+    return f"{idx}/{total_batches}"
 
 
 def build_assignment_schema(topic_slugs: list[str]) -> dict[str, Any]:
@@ -285,18 +309,87 @@ def main() -> int:
     claim_topics: list[tuple[str, str, str]] = []
     topic_claims: dict[str, list[str]] = {}
     topic_routes: dict[str, set[str]] = {}
+    model_batch_count = 0
+    fallback_batch_count = 0
+    failfast_switch_count = 0
+    stage_started = time.monotonic()
+    stage_timeout_seconds = env_int("STAGE_TIMEOUT_SECONDS", 0, minimum=0)
+    timeout_buffer_seconds = env_int("TOPIC_LIFTER_TIMEOUT_BUFFER_SECONDS", 30, minimum=0)
+    failfast_on_timeout = env_bool("TOPIC_LIFTER_FAILFAST_ON_TIMEOUT", default=True)
+    model_budget_exhausted = False
 
-    batches = chunk_claims(claims=claims, batch_size=MAX_CLAIMS_PER_BATCH)
-    for batch in batches:
-        try:
-            assignments, model_route_used = assign_topics_with_model(
-                batch_claims=batch, topics_cfg=topics_cfg
-            )
-        except ModelCallError as exc:
-            logger.warning("Topic-lifter model call failed; using fallback detection: %s", exc)
+    batch_size = effective_batch_size()
+    batches = chunk_claims(claims=claims, batch_size=batch_size)
+    emit_progress(
+        "lift_topics",
+        "batch_plan",
+        total_batches=len(batches),
+        batch_size=batch_size,
+        total_claims=len(claims),
+    )
+    for idx, batch in enumerate(batches, start=1):
+        batch_started = time.monotonic()
+        used_fallback = False
+        batch_claim_ids = [str(row[0]) for row in batch]
+        emit_progress(
+            "lift_topics",
+            "batch_start",
+            index=batch_index(idx, len(batches)),
+            claim_ids=",".join(batch_claim_ids),
+        )
+
+        elapsed_since_stage_start = time.monotonic() - stage_started
+        if stage_timeout_seconds > 0 and elapsed_since_stage_start >= max(
+            0, stage_timeout_seconds - timeout_buffer_seconds
+        ):
+            model_budget_exhausted = True
+
+        if model_budget_exhausted:
             assignments, model_route_used = assign_topics_fallback(
                 batch_claims=batch, topics_cfg=topics_cfg
             )
+            used_fallback = True
+            failfast_switch_count += 1
+            if failfast_switch_count == 1:
+                logger.warning(
+                    "Switching topic lifter to heuristic fallback for remaining batches: "
+                    "elapsed=%.1fs timeout=%ss buffer=%ss",
+                    elapsed_since_stage_start,
+                    stage_timeout_seconds,
+                    timeout_buffer_seconds,
+                )
+        else:
+            try:
+                assignments, model_route_used = assign_topics_with_model(
+                    batch_claims=batch, topics_cfg=topics_cfg
+                )
+            except ModelCallError as exc:
+                logger.warning("Topic-lifter model call failed; using fallback detection: %s", exc)
+                assignments, model_route_used = assign_topics_fallback(
+                    batch_claims=batch, topics_cfg=topics_cfg
+                )
+                used_fallback = True
+                if failfast_on_timeout and "timed out" in str(exc).lower():
+                    model_budget_exhausted = True
+                    logger.warning(
+                        "Timeout failfast activated for topic_lifter; "
+                        "remaining batches will use heuristic fallback."
+                    )
+        batch_elapsed_ms = elapsed_ms(batch_started)
+        if used_fallback:
+            fallback_batch_count += 1
+        else:
+            model_batch_count += 1
+        emit_progress(
+            "lift_topics",
+            "batch_done",
+            index=batch_index(idx, len(batches)),
+            claims=len(batch),
+            mode="fallback" if used_fallback else "model",
+            route=model_route_used,
+            claim_ids=",".join(batch_claim_ids),
+            elapsed_ms=batch_elapsed_ms,
+        )
 
         for claim_id, _, _, _ in batch:
             slug = assignments.get(str(claim_id), "misc")
@@ -359,9 +452,15 @@ def main() -> int:
         )
     conn.close()
 
-    print(f"Claims processed: {len(claims)}")
-    print(f"Topics created: {len(topic_claims)}")
-    print(f"Misc ratio: {misc_ratio:.2f}")
+    emit_progress("lift_topics", "claims_processed", total=len(claims))
+    emit_progress(
+        "lift_topics",
+        "batch_summary",
+        model_batches=model_batch_count,
+        fallback_batches=fallback_batch_count,
+    )
+    emit_progress("lift_topics", "topics_created", total=len(topic_claims))
+    emit_progress("lift_topics", "misc_ratio", value=f"{misc_ratio:.2f}")
     return 0
 
 

@@ -12,6 +12,8 @@ from pathlib import Path
 from typing import Any
 
 from daily_blog.core.env import load_env_file
+from daily_blog.core.env_parsing import env_float, env_int
+from daily_blog.core.progress import elapsed_ms, emit_progress
 from daily_blog.core.time_utils import now_iso
 from orchestrator_utils import ModelCallError, call_model
 
@@ -233,13 +235,33 @@ def upsert_claims(conn: sqlite3.Connection, rows: list[tuple]) -> int:
     return inserted
 
 
-def parse_int_env(name: str, default: int, minimum: int = 1) -> int:
-    raw = os.getenv(name, str(default))
-    try:
-        value = int(raw)
-    except ValueError:
-        value = default
-    return max(1 if minimum < 1 else minimum, value)
+def record_index(idx: int, total: int) -> str:
+    return f"{idx}/{total}"
+
+
+def emit_record_done(
+    *,
+    idx: int,
+    total: int,
+    entry_id: str,
+    status: str,
+    route: str,
+    started_at: float,
+    evidence: str = "",
+    quality_gate: str = "",
+) -> None:
+    fields: dict[str, object] = {
+        "index": record_index(idx, total),
+        "entry_id": entry_id,
+        "status": status,
+        "route": route,
+        "elapsed_ms": elapsed_ms(started_at),
+    }
+    if evidence:
+        fields["evidence"] = evidence
+    if quality_gate:
+        fields["quality_gate"] = quality_gate
+    emit_progress("extract_claims", "record_done", **fields)
 
 
 def main() -> int:
@@ -252,18 +274,27 @@ def main() -> int:
 
     conn = sqlite3.connect(sqlite_path)
     init_claims_table(conn)
-    max_mentions = parse_int_env("EXTRACT_MAX_MENTIONS", 300, minimum=1)
-    progress_every = parse_int_env("EXTRACT_PROGRESS_EVERY", 25, minimum=1)
+    max_mentions = env_int("EXTRACT_MAX_MENTIONS", 300, minimum=1)
+    progress_every = env_int("EXTRACT_PROGRESS_EVERY", 25, minimum=1)
+    progress_interval_seconds = env_float("EXTRACT_PROGRESS_INTERVAL_SECONDS", 5.0, minimum=1.0)
     mentions = read_mentions(conn, limit=max_mentions)
     now = now_iso()
     started_at = time.monotonic()
+    last_progress_at = started_at
 
     rows: list[tuple] = []
     fallback_count = 0
     skipped_quality_count = 0
     total_mentions = len(mentions)
-    print(f"[extract_claims] Processing {total_mentions} mentions", flush=True)
+    emit_progress("extract_claims", "processing", total_mentions=total_mentions)
     for idx, (entry_id, title, url, summary) in enumerate(mentions, start=1):
+        record_started = time.monotonic()
+        emit_progress(
+            "extract_claims",
+            "record_start",
+            index=record_index(idx, total_mentions),
+            entry_id=entry_id,
+        )
         extracted, model_route_used = extract_claim(
             entry_id=entry_id,
             title=title or "",
@@ -280,6 +311,15 @@ def main() -> int:
                 entry_id,
             )
             skipped_quality_count += 1
+            emit_record_done(
+                idx=idx,
+                total=total_mentions,
+                entry_id=entry_id,
+                status="skipped",
+                quality_gate="missing_fields",
+                route=model_route_used,
+                started_at=record_started,
+            )
             continue
 
         problem = str(extracted.get("problem_pressure", "")).strip() or infer_problem(
@@ -308,24 +348,44 @@ def main() -> int:
                 now,
             )
         )
-        if idx % progress_every == 0 or idx == total_mentions:
+        emit_record_done(
+            idx=idx,
+            total=total_mentions,
+            entry_id=entry_id,
+            status="ready",
+            route=model_route_used,
+            evidence=evidence,
+            started_at=record_started,
+        )
+        now_monotonic = time.monotonic()
+        should_print_progress = (
+            idx == 1
+            or idx == total_mentions
+            or idx % progress_every == 0
+            or (now_monotonic - last_progress_at) >= progress_interval_seconds
+        )
+        if should_print_progress:
             elapsed = max(0.001, time.monotonic() - started_at)
             rows_ready_rate = len(rows) / elapsed
-            print(
-                "[extract_claims] "
-                f"progress={idx}/{total_mentions} "
-                f"rows_ready={len(rows)} "
-                f"fallbacks={fallback_count} "
-                f"skipped={skipped_quality_count} "
-                f"rows_ready_rate={rows_ready_rate:.1f}/s",
-                flush=True,
+            emit_progress(
+                "extract_claims",
+                "progress",
+                index=record_index(idx, total_mentions),
+                rows_ready=len(rows),
+                fallbacks=fallback_count,
+                skipped=skipped_quality_count,
+                rows_ready_rate=f"{rows_ready_rate:.1f}/s",
             )
+            last_progress_at = now_monotonic
 
     count = upsert_claims(conn, rows)
     conn.close()
-    print(
-        f"Claims upserted: {count} (fallbacks={fallback_count}, skipped={skipped_quality_count})",
-        flush=True,
+    emit_progress(
+        "extract_claims",
+        "complete",
+        claims_upserted=count,
+        fallbacks=fallback_count,
+        skipped=skipped_quality_count,
     )
     return 0
 

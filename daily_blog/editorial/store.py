@@ -91,8 +91,7 @@ def init_editorial_table(conn: sqlite3.Connection) -> None:
         )
     if "code_required" not in columns:
         conn.execute(
-            "ALTER TABLE editorial_candidates ADD COLUMN "
-            "code_required INTEGER NOT NULL DEFAULT 0"
+            "ALTER TABLE editorial_candidates ADD COLUMN code_required INTEGER NOT NULL DEFAULT 0"
         )
     if "transformability_score" not in columns:
         conn.execute(
@@ -126,13 +125,11 @@ def init_editorial_table(conn: sqlite3.Connection) -> None:
         )
     if "reason_codes" not in columns:
         conn.execute(
-            "ALTER TABLE editorial_candidates ADD COLUMN "
-            "reason_codes TEXT NOT NULL DEFAULT '[]'"
+            "ALTER TABLE editorial_candidates ADD COLUMN reason_codes TEXT NOT NULL DEFAULT '[]'"
         )
     if "topic_confidence" not in columns:
         conn.execute(
-            "ALTER TABLE editorial_candidates ADD COLUMN "
-            "topic_confidence REAL NOT NULL DEFAULT 0.0"
+            "ALTER TABLE editorial_candidates ADD COLUMN topic_confidence REAL NOT NULL DEFAULT 0.0"
         )
     if "classifier_trace" not in columns:
         conn.execute(

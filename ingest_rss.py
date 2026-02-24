@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from daily_blog.core.env import load_env_file
-from daily_blog.core.time_utils import utc_now_iso
+from daily_blog.core.time_utils import now_iso
 
 DEFAULT_FEEDS_FILE = "feeds.txt"
 DEFAULT_SQLITE_PATH = "./data/daily-blog.db"
@@ -209,14 +209,14 @@ def upsert_mentions(conn: sqlite3.Connection, mentions: list[Mention]) -> int:
 def main() -> int:
     load_env_file(Path(".env"))
 
-    feeds_file = Path(os.getenv("FEEDS_FILE", DEFAULT_FEEDS_FILE))
+    feeds_file = Path(os.getenv("INGEST_FEEDS_FILE", DEFAULT_FEEDS_FILE))
     sqlite_path = Path(os.getenv("SQLITE_PATH", DEFAULT_SQLITE_PATH))
-    output_jsonl = Path(os.getenv("OUTPUT_JSONL", DEFAULT_OUTPUT_JSONL))
+    output_jsonl = Path(os.getenv("INGEST_OUTPUT_JSONL", DEFAULT_OUTPUT_JSONL))
 
     try:
-        max_items = int(os.getenv("MAX_ITEMS_PER_FEED", str(DEFAULT_MAX_ITEMS)))
+        max_items = int(os.getenv("INGEST_MAX_ITEMS_PER_FEED", str(DEFAULT_MAX_ITEMS)))
     except ValueError:
-        print("Invalid MAX_ITEMS_PER_FEED; must be an integer", file=sys.stderr)
+        print("Invalid INGEST_MAX_ITEMS_PER_FEED; must be an integer", file=sys.stderr)
         return 2
 
     try:
@@ -236,7 +236,7 @@ def main() -> int:
     all_mentions: list[Mention] = []
     failed = 0
     for url in feeds:
-        fetched_at = utc_now_iso()
+        fetched_at = now_iso()
         try:
             payload = fetch_feed(url)
             mentions = parse_feed(payload, url, max_items, fetched_at)

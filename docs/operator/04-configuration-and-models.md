@@ -8,11 +8,11 @@
 
 ## `.env` knobs you will likely tune
 
-- `FEEDS_FILE`: RSS source list path
-- `MAX_ITEMS_PER_FEED`: ingest depth
+- `INGEST_FEEDS_FILE`: RSS source list path
+- `INGEST_MAX_ITEMS_PER_FEED`: ingest depth
 - `SQLITE_PATH`: main database
 - `RULES_ENGINE_CONFIG`: scoring config location
-- `DAILY_BOARD_PATH`, `TOP_OUTLINES_PATH`, `RESEARCH_PACK_PATH`: output destinations
+- `SCORE_BOARD_PATH`, `EDITORIAL_OUTLINES_PATH`, `EDITORIAL_RESEARCH_PACK_PATH`: output destinations
 - `PIPELINE_RETRIES`: retry count for stage failures
 - `PIPELINE_STAGE_TIMEOUTS`: optional JSON map of stage timeout overrides
 

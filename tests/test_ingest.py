@@ -1,16 +1,14 @@
 import os
 import sqlite3
 import subprocess
-import tempfile
 import unittest
-from pathlib import Path
+
+from tests.fixtures import TestBase
 
 
-class TestIngest(unittest.TestCase):
+class TestIngest(TestBase):
     def setUp(self) -> None:
-        self.tmp = tempfile.TemporaryDirectory()
-        self.root = Path(self.tmp.name)
-        self.db = self.root / "test.db"
+        super().setUp()
         self.feeds_file = self.root / "feeds.txt"
         self.output_jsonl = self.root / "mentions.jsonl"
 
@@ -33,9 +31,6 @@ class TestIngest(unittest.TestCase):
             encoding="utf-8",
         )
 
-    def tearDown(self) -> None:
-        self.tmp.cleanup()
-
     def test_ingest_from_local_file_url(self) -> None:
         # Use file:// URL to test ingestion without network
         feed_url = self.rss_file.as_uri()
@@ -43,10 +38,10 @@ class TestIngest(unittest.TestCase):
 
         env = {
             **os.environ,
-            "FEEDS_FILE": str(self.feeds_file),
+            "INGEST_FEEDS_FILE": str(self.feeds_file),
             "SQLITE_PATH": str(self.db),
-            "OUTPUT_JSONL": str(self.output_jsonl),
-            "MAX_ITEMS_PER_FEED": "10",
+            "INGEST_OUTPUT_JSONL": str(self.output_jsonl),
+            "INGEST_MAX_ITEMS_PER_FEED": "10",
         }
 
         proc = subprocess.run(["python3", "ingest_rss.py"], env=env, capture_output=True, text=True)
@@ -64,7 +59,7 @@ class TestIngest(unittest.TestCase):
         self.feeds_file.write_text("", encoding="utf-8")
         env = {
             **os.environ,
-            "FEEDS_FILE": str(self.feeds_file),
+            "INGEST_FEEDS_FILE": str(self.feeds_file),
             "SQLITE_PATH": str(self.db),
         }
         proc = subprocess.run(["python3", "ingest_rss.py"], env=env, capture_output=True, text=True)

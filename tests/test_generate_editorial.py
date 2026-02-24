@@ -2,52 +2,21 @@ import json
 import os
 import sqlite3
 import subprocess
-import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from tests.fixtures import TestBase, make_test_db
 
-class TestGenerateEditorial(unittest.TestCase):
+
+class TestGenerateEditorial(TestBase):
     def setUp(self) -> None:
-        self.tmp = tempfile.TemporaryDirectory()
-        self.root = Path(self.tmp.name)
-        self.db = self.root / "test.db"
+        super().setUp()
         self.outlines = self.root / "top_outlines.md"
         self.research = self.root / "research_pack.json"
         self.routing = Path.cwd() / "config" / "model-routing.json"
 
-        conn = sqlite3.connect(self.db)
-        conn.execute(
-            """
-            CREATE TABLE topic_clusters (
-                topic_id TEXT PRIMARY KEY,
-                parent_topic_slug TEXT NOT NULL,
-                parent_topic_label TEXT NOT NULL,
-                why_it_matters TEXT NOT NULL,
-                time_horizon TEXT NOT NULL,
-                claim_count INTEGER NOT NULL,
-                keywords_json TEXT NOT NULL,
-                created_at TEXT NOT NULL
-            )
-            """
-        )
-        conn.execute(
-            """
-            CREATE TABLE enrichment_sources (
-                topic_id TEXT NOT NULL,
-                query_terms_json TEXT NOT NULL,
-                domain TEXT NOT NULL,
-                url TEXT NOT NULL,
-                stance TEXT NOT NULL,
-                credibility_guess TEXT NOT NULL,
-                fetched_ok INTEGER NOT NULL,
-                created_at TEXT NOT NULL,
-                PRIMARY KEY (topic_id, url)
-            )
-            """
-        )
-
+        conn = make_test_db(self.db, ["topic_clusters", "enrichment_sources"])
         conn.execute(
             """
             INSERT INTO topic_clusters (
@@ -87,15 +56,12 @@ class TestGenerateEditorial(unittest.TestCase):
         conn.commit()
         conn.close()
 
-    def tearDown(self) -> None:
-        self.tmp.cleanup()
-
     def test_generate_editorial_output_structure(self) -> None:
         env = {
             **os.environ,
             "SQLITE_PATH": str(self.db),
-            "TOP_OUTLINES_PATH": str(self.outlines),
-            "RESEARCH_PACK_PATH": str(self.research),
+            "EDITORIAL_OUTLINES_PATH": str(self.outlines),
+            "EDITORIAL_RESEARCH_PACK_PATH": str(self.research),
             "MODEL_ROUTING_CONFIG": str(Path.cwd() / "tests" / "model-routing-fast-fail.json"),
             "GOOGLE_API_KEY": "",
             "EDITORIAL_STATIC_ONLY": "1",
@@ -156,32 +122,7 @@ class TestGenerateEditorial(unittest.TestCase):
     def test_generate_editorial_model_path_and_persisted_evidence_brief(self) -> None:
         import generate_editorial
 
-        conn = sqlite3.connect(self.db)
-        conn.execute(
-            """
-            CREATE TABLE claims (
-                claim_id TEXT PRIMARY KEY,
-                entry_id TEXT NOT NULL,
-                headline TEXT NOT NULL,
-                who_cares TEXT NOT NULL,
-                problem_pressure TEXT NOT NULL,
-                proposed_solution TEXT NOT NULL,
-                evidence_type TEXT NOT NULL,
-                sources_json TEXT NOT NULL,
-                created_at TEXT NOT NULL
-            )
-            """
-        )
-        conn.execute(
-            """
-            CREATE TABLE claim_topic_map (
-                claim_id TEXT NOT NULL,
-                topic_id TEXT NOT NULL,
-                created_at TEXT NOT NULL,
-                PRIMARY KEY (claim_id, topic_id)
-            )
-            """
-        )
+        conn = make_test_db(self.db, ["claims", "claim_topic_map"])
         conn.execute(
             """
             INSERT INTO claims (
@@ -281,8 +222,8 @@ class TestGenerateEditorial(unittest.TestCase):
         env = {
             **os.environ,
             "SQLITE_PATH": str(self.db),
-            "TOP_OUTLINES_PATH": str(self.outlines),
-            "RESEARCH_PACK_PATH": str(self.research),
+            "EDITORIAL_OUTLINES_PATH": str(self.outlines),
+            "EDITORIAL_RESEARCH_PACK_PATH": str(self.research),
             "MODEL_ROUTING_CONFIG": str(self.routing),
             "EDITORIAL_STATIC_ONLY": "0",
             "GOOGLE_API_KEY": "",
@@ -364,8 +305,8 @@ class TestGenerateEditorial(unittest.TestCase):
         base_env = {
             **os.environ,
             "SQLITE_PATH": str(self.db),
-            "TOP_OUTLINES_PATH": str(self.outlines),
-            "RESEARCH_PACK_PATH": str(self.research),
+            "EDITORIAL_OUTLINES_PATH": str(self.outlines),
+            "EDITORIAL_RESEARCH_PACK_PATH": str(self.research),
             "MODEL_ROUTING_CONFIG": str(Path.cwd() / "tests" / "model-routing-fast-fail.json"),
             "EDITORIAL_STATIC_ONLY": "1",
             "GOOGLE_API_KEY": "",

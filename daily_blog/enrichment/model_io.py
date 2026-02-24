@@ -3,6 +3,7 @@ import logging
 import os
 from typing import Any
 
+from daily_blog.core.env_parsing import env_bool
 from daily_blog.enrichment.helpers import credibility_for_domain, domain_for_url, normalize_url
 from orchestrator_utils import ModelCallError, call_model
 
@@ -67,7 +68,7 @@ def fetch_model_sources(
     known_sources: list[str],
     query_terms: list[str],
 ) -> tuple[list[dict[str, str]], str]:
-    if os.getenv("ENRICH_SKIP_MODEL", "0") == "1":
+    if env_bool("ENRICH_SKIP_MODEL", False):
         return [], "model-skipped"
     prompt = build_enrichment_prompt(
         topic_label=topic_label,

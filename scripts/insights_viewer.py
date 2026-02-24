@@ -96,16 +96,22 @@ def _env_values() -> dict[str, str]:
         "PIPELINE_RETRIES",
         "PIPELINE_STAGE_TIMEOUT_SECONDS",
         "PIPELINE_STAGE_TIMEOUTS",
+        "PIPELINE_SKIP_STAGES",
         "EXTRACT_MAX_MENTIONS",
         "ENRICH_FETCH_TIMEOUT_SECONDS",
         "ENRICH_FETCH_RETRIES",
         "ENRICH_DISCOVER_LIMIT",
         "ENRICH_MAX_KNOWN_CLAIM_URLS",
         "ENRICH_MAX_TOPICS",
+        "ENRICH_MIN_DOMAIN_DIVERSITY",
+        "ENRICH_MAX_PER_DOMAIN",
+        "ENRICH_MIN_CREDIBLE_COUNT",
         "ENRICH_SKIP_MODEL",
         "TOPIC_CURATOR_BATCH_SIZE",
-        "FORCE_TOPIC_RECURATE",
+        "TOPIC_CONFIDENCE_THRESHOLD",
+        "FORCE_TOPIC_RECURATION",
         "EDITORIAL_STATIC_ONLY",
+        "EDITORIAL_INCLUDE_MISC",
     ]
     return {k: os.getenv(k, "") for k in tracked_keys if k in os.environ}
 
@@ -215,6 +221,15 @@ def _prompt_stage_specs() -> dict[str, dict]:
                     "- evidence_type (string enum: data|link|anecdote)",
                     "- sources (array of source URL strings)",
                     "",
+                    "Quality requirements:",
+                    "- Keep headline specific and concise.",
+                    "- who_cares must identify a concrete audience segment.",
+                    "- Do not invent unsupported facts.",
+                    (
+                        "- If uncertainty is high, still provide best-effort "
+                        "extraction from given content."
+                    ),
+                    "",
                     "Mention title:",
                     "{mention_title}",
                     "",
@@ -281,6 +296,11 @@ def _prompt_stage_specs() -> dict[str, dict]:
                     "Task:",
                     "- Assign every claim to exactly one topic slug from the allowed list.",
                     "- Use only the provided claim_id values and only allowed topic_slug values.",
+                    (
+                        "- Assign a claim to 'misc' ONLY if it shares no domain, entities, "
+                        "or problem-type with any other claim in the batch. Avoid 'misc' "
+                        "whenever the claim plausibly fits another slug."
+                    ),
                     "- Return ONLY valid JSON matching the required schema.",
                     "",
                     "Allowed topic slugs:",
@@ -493,6 +513,7 @@ def _prompt_stage_specs() -> dict[str, dict]:
                     ),
                     "",
                     "Return JSON only. No prose outside JSON.",
+                    "Return a single JSON object. Do not wrap it in an array.",
                     "",
                     "Topic context:",
                     "- label: {topic_label}",
@@ -555,6 +576,109 @@ def _prompt_stage_specs() -> dict[str, dict]:
             },
             "notes": [
                 "Evidence gate may suppress editorial output when status is BLOCK.",
+            ],
+        },
+        "evidence_synthesis": {
+            "script": "daily_blog/editorial/synthesis.py",
+            "purpose": (
+                "Synthesize topic claims and validated sources into a structured "
+                "evidence brief."
+            ),
+            "default_template": "\n".join(
+                [
+                    (
+                        "Synthesize topic evidence into a concise structured brief "
+                        "for editorial planning."
+                    ),
+                    "Return JSON only matching schema.",
+                    "",
+                    "topic_id: {topic_id}",
+                    "topic_label: {topic_label}",
+                    "",
+                    "claims:",
+                    "{claims_lines}",
+                    "",
+                    "validated_sources:",
+                    "{validated_sources_lines}",
+                    "",
+                    "baseline_inference:",
+                    "{fallback_brief_json}",
+                ]
+            ),
+            "variables": [
+                {"name": "topic_id", "type": "string", "description": "Topic identifier."},
+                {"name": "topic_label", "type": "string", "description": "Curated topic label."},
+                {
+                    "name": "claims_lines",
+                    "type": "string",
+                    "description": (
+                        "Bullet-list claim summaries with headline/problem/"
+                        "solution/evidence."
+                    ),
+                },
+                {
+                    "name": "validated_sources_lines",
+                    "type": "string",
+                    "description": (
+                        "Bullet-list validated sources with domain, stance, "
+                        "credibility, and URL."
+                    ),
+                },
+                {
+                    "name": "fallback_brief_json",
+                    "type": "json-object",
+                    "description": "Deterministic baseline evidence brief used as grounding.",
+                },
+            ],
+            "inputs_example": {
+                "topic_id": "ai",
+                "topic_label": "AI deployment reliability",
+                "claims_lines": (
+                    "- headline=Schema-first extraction reduced failures | pressure=triage load | "
+                    "solution=strict JSON with fallback | evidence_type=data"
+                ),
+                "validated_sources_lines": (
+                    "- domain=docs.example.org | stance=supports | cred=high | "
+                    "https://docs.example.org/post"
+                ),
+                "fallback_brief_json": {
+                    "topic_id": "ai",
+                    "claim_count": 3,
+                    "top_claims": ["Schema-first extraction reduced failures"],
+                    "problem_pressures": ["triage load"],
+                    "proposed_solutions": ["strict JSON with fallback"],
+                    "evidence_type_counts": {"data": 2, "link": 1},
+                    "stance_breakdown": {"supports": 2},
+                    "dominant_pattern": "data-backed",
+                    "outline_strategy": "implementation-guide",
+                },
+            },
+            "output_contract": {
+                "required": [
+                    "topic_id",
+                    "claim_count",
+                    "top_claims",
+                    "problem_pressures",
+                    "proposed_solutions",
+                    "evidence_type_counts",
+                    "stance_breakdown",
+                    "dominant_pattern",
+                    "outline_strategy",
+                ],
+            },
+            "output_example": {
+                "topic_id": "ai",
+                "claim_count": 3,
+                "top_claims": ["Schema-first extraction reduced failures"],
+                "problem_pressures": ["triage load"],
+                "proposed_solutions": ["strict JSON with fallback"],
+                "evidence_type_counts": {"data": 2, "link": 1},
+                "stance_breakdown": {"supports": 2},
+                "dominant_pattern": "data-backed",
+                "outline_strategy": "implementation-guide",
+            },
+            "notes": [
+                "If model synthesis fails, deterministic fallback brief is used.",
             ],
         },
     }
@@ -1035,6 +1159,16 @@ def _settings_form_definition() -> dict:
                         "type": "prompt_override",
                         "stage_id": "editorial",
                         "help": "Optional prefix/suffix/template overrides for editorial stage.",
+                    },
+                    {
+                        "path": "prompts.evidence_synthesis",
+                        "label": "Evidence Synthesis Prompt Override",
+                        "type": "prompt_override",
+                        "stage_id": "evidence_synthesis",
+                        "help": (
+                            "Optional prefix/suffix/template overrides for "
+                            "evidence synthesis stage."
+                        ),
                     },
                 ],
             },
