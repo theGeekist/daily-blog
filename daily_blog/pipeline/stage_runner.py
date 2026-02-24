@@ -4,7 +4,8 @@ import time
 import traceback
 from typing import Any
 
-from daily_blog.core.tracing import trace_enabled as _trace_enabled, trace_event as _trace_event  # noqa: F401
+from daily_blog.core.tracing import trace_enabled as _trace_enabled  # noqa: F401
+from daily_blog.core.tracing import trace_event as _trace_event
 from daily_blog.pipeline.subprocess_runner import (
     _canonical_model_name,
     _coerce_text,

@@ -1,6 +1,5 @@
 import json
 import logging
-import os
 from typing import Any
 
 from daily_blog.core.env_parsing import env_bool

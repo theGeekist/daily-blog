@@ -6,7 +6,8 @@ from pathlib import Path
 from typing import Any
 
 from daily_blog.core.env_parsing import env_int as _env_int
-from daily_blog.core.tracing import trace_enabled as _trace_enabled, trace_event as _trace_event  # noqa: F401
+from daily_blog.core.tracing import trace_enabled as _trace_enabled  # noqa: F401
+from daily_blog.core.tracing import trace_event as _trace_event
 from daily_blog.model_inference.backpressure import (
     maybe_apply_model_backpressure,
     model_backpressure_message,
@@ -38,7 +39,10 @@ from daily_blog.model_inference.dispatch import (
 from daily_blog.model_inference.dispatch import (
     parse_model_ref as _parse_model_ref,
 )
-from daily_blog.model_inference.errors import ModelCallError, ModelOutputValidationError  # noqa: F401
+from daily_blog.model_inference.errors import (  # noqa: F401
+    ModelCallError,
+    ModelOutputValidationError,
+)
 from daily_blog.model_inference.schema import (
     extract_json_payload as _extract_json_payload,
 )

@@ -73,7 +73,9 @@ class TestOrchestratorUtils(unittest.TestCase):
             del model_name, prompt, schema
             return responses.pop(0)
 
-        with patch("daily_blog.model_inference.caller._dispatch_model", side_effect=_fake_dispatch) as dispatch:
+        with patch(
+            "daily_blog.model_inference.caller._dispatch_model", side_effect=_fake_dispatch
+        ) as dispatch:
             parsed = _invoke_with_retries(
                 model_name="opencode:test",
                 prompt="x",

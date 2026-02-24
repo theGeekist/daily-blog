@@ -202,7 +202,7 @@ def main() -> int:
         )
     ).fetchall()
     if not rows:
-        if force_recurate:
+        if force_recuration:
             print("No topics found. Run lift_topics.py first.", file=sys.stderr)
             conn.close()
             return 2
