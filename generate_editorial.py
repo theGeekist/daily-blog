@@ -27,6 +27,51 @@ DEFAULT_MODEL_ROUTING_PATH = "./config/model-routing.json"
 DEFAULT_RULES_ENGINE_PATH = "./config/rules-engine.json"
 
 
+def _load_discussion_signals(conn: sqlite3.Connection, topic_id: str) -> dict[str, list[str]]:
+    try:
+        rows = conn.execute(
+            """
+            SELECT problem_statements_json, solution_statements_json
+            FROM discussion_receipts
+            WHERE topic_id = ?
+            """,
+            (topic_id,),
+        ).fetchall()
+    except sqlite3.OperationalError:
+        return {"problem_statements": [], "solution_statements": []}
+
+    def _collect(index: int) -> list[str]:
+        out: list[str] = []
+        seen: set[str] = set()
+        for row in rows:
+            raw = row[index] if len(row) > index else "[]"
+            try:
+                loaded = json.loads(raw or "[]")
+            except Exception:
+                loaded = []
+            if not isinstance(loaded, list):
+                continue
+            for item in loaded:
+                if not isinstance(item, str):
+                    continue
+                cleaned = " ".join(item.strip().split())
+                if not cleaned:
+                    continue
+                lowered = cleaned.lower()
+                if lowered in seen:
+                    continue
+                seen.add(lowered)
+                out.append(cleaned)
+                if len(out) >= 12:
+                    return out
+        return out
+
+    return {
+        "problem_statements": _collect(0),
+        "solution_statements": _collect(1),
+    }
+
+
 def main() -> int:
     load_env_file(Path(".env"))
     sqlite_path = Path(os.getenv("SQLITE_PATH", DEFAULT_SQLITE_PATH))
@@ -101,6 +146,7 @@ def main() -> int:
         ]
 
         static_only = os.getenv("EDITORIAL_STATIC_ONLY", "0") == "1"
+        discussion_signals = _load_discussion_signals(conn, str(topic_id))
         if bool(assessment.get("output_suppressed")):
             package = blocked_editorial_package(label, why, evidence_reasons)
             model_route_used = "evidence-gate:block"
@@ -113,6 +159,8 @@ def main() -> int:
                 why_it_matters=why,
                 time_horizon=time_horizon,
                 validated_sources=valid_sources,
+                problem_statements=discussion_signals["problem_statements"],
+                solution_statements=discussion_signals["solution_statements"],
             )
             try:
                 response = call_model(EDITORIAL_STAGE, prompt, schema=EDITORIAL_RESPONSE_SCHEMA)
@@ -199,6 +247,7 @@ def main() -> int:
                 "evidence_ui_state": evidence_ui_state,
                 "evidence_reasons": evidence_reasons,
                 "evidence_metrics": assessment.get("metrics", {}),
+                "discussion_signals": discussion_signals,
             }
         )
 
