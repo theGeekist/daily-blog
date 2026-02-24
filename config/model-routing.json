@@ -1,47 +1,38 @@
 {
   "coordinator": {
-    "primary": "codex-5.3",
-    "fallback": "gemini-3-pro"
+    "primary": "opencode:openai/gpt-5.2",
+    "fallback": "opencode:openai/gpt-5.2-codex",
+    "fallbacks": ["ollama:llama3.2:latest", "ollama:llama3.1:8b"]
   },
   "extractor": {
-    "primary": "ollama:qwen2.5:7b",
-    "fallback": "gemini-3-pro",
-    "local_candidates": [
-      "ollama:qwen2.5:7b",
-      "ollama:qwen2.5:14b",
-      "ollama:llama3.1:8b"
-    ]
+    "primary": "opencode:openai/gpt-5.2",
+    "fallback": "opencode:openai/gpt-5.2-codex",
+    "fallbacks": ["ollama:llama3.2:latest", "ollama:llama3.1:8b"]
   },
   "topic_lifter": {
-    "primary": "ollama:qwen2.5:14b",
-    "fallback": "ollama:qwen2.5:7b",
-    "local_candidates": [
-      "ollama:qwen2.5:14b",
-      "ollama:qwen2.5:7b",
-      "ollama:llama3.1:8b"
-    ]
+    "primary": "opencode:openai/gpt-5.2",
+    "fallback": "opencode:openai/gpt-5.2-codex",
+    "fallbacks": ["ollama:llama3.2:latest", "ollama:llama3.1:8b"]
   },
   "topic_curator": {
-    "primary": "ollama:qwen2.5:7b",
-    "fallback": "ollama:llama3.1:8b",
-    "local_candidates": [
-      "ollama:qwen2.5:7b",
-      "ollama:llama3.1:8b",
-      "ollama:mistral-nemo:12b"
-    ]
+    "primary": "opencode:openai/gpt-5.2",
+    "fallback": "opencode:openai/gpt-5.2-codex",
+    "fallbacks": ["ollama:llama3.2:latest", "ollama:llama3.1:8b"]
+  },
+  "evidence_synthesis": {
+    "primary": "opencode:openai/gpt-5.2",
+    "fallback": "opencode:openai/gpt-5.2-codex",
+    "fallbacks": ["ollama:llama3.2:latest", "ollama:llama3.1:8b"]
   },
   "enrichment": {
-    "primary": "codex-5.3",
-    "fallback": "glm5"
+    "primary": "opencode:openai/gpt-5.2",
+    "fallback": "opencode:openai/gpt-5.2-codex",
+    "fallbacks": ["ollama:llama3.2:latest", "ollama:llama3.1:8b"]
   },
   "editorial": {
-    "primary": "ollama:qwen2.5:14b",
-    "fallback": "codex-5.3",
-    "local_candidates": [
-      "ollama:qwen2.5:14b",
-      "ollama:llama3.1:8b",
-      "ollama:mistral-nemo:12b"
-    ]
+    "primary": "opencode:openai/gpt-5.2",
+    "fallback": "opencode:openai/gpt-5.2-codex",
+    "fallbacks": ["ollama:llama3.2:latest", "ollama:llama3.1:8b"]
   },
   "ranker": {
     "primary": "deterministic-code",

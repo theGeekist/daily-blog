@@ -8,6 +8,7 @@ from pathlib import Path
 
 from daily_blog.core.env import load_env_file
 from daily_blog.core.time_utils import now_iso
+from daily_blog.enrichment.discussion import harvest_discussion_receipts
 from daily_blog.enrichment.fetch import discover_web_sources, verify_source_fetch
 from daily_blog.enrichment.helpers import (
     credibility_for_domain,
@@ -18,11 +19,13 @@ from daily_blog.enrichment.helpers import (
     normalize_url,
     parse_keywords_json,
 )
-from daily_blog.enrichment.model_io import fetch_model_sources
+from daily_blog.enrichment.model_io import fetch_discussion_signals, fetch_model_sources
 from daily_blog.enrichment.store import (
     enrichment_has_model_route,
+    init_discussion_receipts_table,
     init_enrichment_table,
     topic_clusters_has_normalized_label,
+    upsert_discussion_receipt,
     upsert_enrichment_source,
 )
 
@@ -40,6 +43,7 @@ def main() -> int:
 
     conn = sqlite3.connect(sqlite_path)
     init_enrichment_table(conn)
+    init_discussion_receipts_table(conn)
     has_model_route_column = enrichment_has_model_route(conn)
     has_normalized_label = topic_clusters_has_normalized_label(conn)
 
@@ -115,6 +119,19 @@ def main() -> int:
             if len(known_sources) >= max_known_claim_urls:
                 break
 
+        receipts = harvest_discussion_receipts(known_sources)
+        discussion_signals, discussion_route_used = fetch_discussion_signals(
+            topic_id=topic_id,
+            topic_label=label,
+            query_terms=query_terms,
+            receipts=receipts,
+        )
+        for term in discussion_signals["query_terms"]:
+            lowered = term.lower()
+            if lowered not in query_terms:
+                query_terms.append(lowered)
+        query_terms = query_terms[:30]
+
         discovered_urls = discover_web_sources(
             topic_label=label,
             query_terms=query_terms,
@@ -173,6 +190,7 @@ def main() -> int:
 
         source_map = filter_sources_for_quality(source_map, min_credible_count=3)
         conn.execute("DELETE FROM enrichment_sources WHERE topic_id = ?", (topic_id,))
+        conn.execute("DELETE FROM discussion_receipts WHERE topic_id = ?", (topic_id,))
         query_terms_json = json.dumps(query_terms, ensure_ascii=True)
         for source in source_map.values():
             upsert_enrichment_source(
@@ -185,6 +203,25 @@ def main() -> int:
                 model_route_used=model_route_used,
             )
             rows_written += 1
+        problem_json = json.dumps(discussion_signals["problem_statements"], ensure_ascii=True)
+        solution_json = json.dumps(discussion_signals["solution_statements"], ensure_ascii=True)
+        for receipt in receipts:
+            source_url = str(receipt.get("source_url", ""))
+            if not source_url:
+                continue
+            upsert_discussion_receipt(
+                conn=conn,
+                topic_id=str(topic_id),
+                source_url=source_url,
+                platform=str(receipt.get("platform", "")),
+                query_used=str(receipt.get("query_used", "")),
+                receipt_text=str(receipt.get("receipt_text", "")),
+                comment_count=int(receipt.get("comment_count", 0) or 0),
+                problem_statements_json=problem_json,
+                solution_statements_json=solution_json,
+                model_route_used=discussion_route_used,
+                now=now,
+            )
 
     conn.commit()
     conn.close()
