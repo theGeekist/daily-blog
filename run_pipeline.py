@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-import json
 import os
 import sqlite3
 import time
 from pathlib import Path
 
+from daily_blog.config import load_app_config, resolve_stage_timeouts
 from daily_blog.core.env import load_env_file
 from daily_blog.core.json_utils import load_json_file
 from daily_blog.core.time_utils import now_iso, run_id_now
@@ -21,83 +21,28 @@ from daily_blog.pipeline.snapshot_service import (
 )
 from daily_blog.pipeline.stage_runner import run_stage
 
-DEFAULT_SQLITE_PATH = "./data/daily-blog.db"
-DEFAULT_MODEL_ROUTING_PATH = Path(__file__).resolve().parent / "config" / "model-routing.json"
-DEFAULT_RULES_ENGINE_PATH = Path(__file__).resolve().parent / "config" / "rules-engine.json"
-DEFAULT_PROMPTS_PATH = Path(__file__).resolve().parent / "config" / "prompts.json"
-DEFAULT_PIPELINE_TIMEOUTS_PATH = (
-    Path(__file__).resolve().parent / "config" / "pipeline-timeouts.json"
-)
 DEFAULT_STAGE_TIMEOUT_SECONDS = 300
-
-
-def _read_int_env(name: str, default: int) -> int:
-    raw = os.getenv(name)
-    if raw is None:
-        return default
-    try:
-        value = int(raw)
-    except ValueError:
-        return default
-    return value if value > 0 else default
-
-
-def _read_stage_skip_set() -> set[str]:
-    raw = os.getenv("PIPELINE_SKIP_STAGES", "").strip()
-    if not raw:
-        return set()
-    try:
-        loaded = json.loads(raw)
-    except json.JSONDecodeError:
-        loaded = None
-    if isinstance(loaded, list):
-        return {str(v).strip() for v in loaded if str(v).strip()}
-    return {part.strip() for part in raw.split(",") if part.strip()}
-
-
-def _load_stage_timeouts(stage_names: list[str]) -> dict[str, int]:
-    default_timeout = _read_int_env("PIPELINE_STAGE_TIMEOUT_SECONDS", DEFAULT_STAGE_TIMEOUT_SECONDS)
-    timeouts = {stage: default_timeout for stage in stage_names}
-
-    path = Path(os.getenv("PIPELINE_TIMEOUTS_PATH", str(DEFAULT_PIPELINE_TIMEOUTS_PATH)))
-    config_timeouts = load_json_file(path)
-    for key, value in config_timeouts.items():
-        if key in timeouts and isinstance(value, int) and value > 0:
-            timeouts[key] = value
-
-    env_overrides = os.getenv("PIPELINE_STAGE_TIMEOUTS")
-    if env_overrides:
-        try:
-            loaded = json.loads(env_overrides)
-        except json.JSONDecodeError:
-            loaded = {}
-        if isinstance(loaded, dict):
-            for key, value in loaded.items():
-                if key in timeouts and isinstance(value, int) and value > 0:
-                    timeouts[key] = value
-
-    return timeouts
 
 
 def main() -> int:
     load_env_file(Path(".env"))
-    sqlite_path = Path(os.getenv("SQLITE_PATH", DEFAULT_SQLITE_PATH))
+    project_root = Path(__file__).resolve().parent
+    app_cfg = load_app_config(project_root=project_root, environ=os.environ)
+    sqlite_path = app_cfg.paths.sqlite_path
     sqlite_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(sqlite_path)
     init_run_metrics(conn)
     init_run_config_tables(conn)
 
     run_id = run_id_now()
-    retries = int(os.getenv("PIPELINE_RETRIES", "2"))
-    skip_stages = _read_stage_skip_set()
+    retries = app_cfg.pipeline.retries
+    skip_stages = app_cfg.pipeline.skip_stages
     stages = configured_stages(skip_stages)
 
-    stage_timeouts = _load_stage_timeouts([stage.name for stage in stages])
-    model_routing = load_json_file(DEFAULT_MODEL_ROUTING_PATH)
-    rules_engine = load_json_file(
-        Path(os.getenv("RULES_ENGINE_CONFIG", str(DEFAULT_RULES_ENGINE_PATH)))
-    )
-    prompts = load_json_file(Path(os.getenv("PROMPTS_CONFIG", str(DEFAULT_PROMPTS_PATH))))
+    stage_timeouts = resolve_stage_timeouts([stage.name for stage in stages], app_cfg)
+    model_routing = load_json_file(app_cfg.paths.model_routing_config)
+    rules_engine = load_json_file(app_cfg.paths.rules_engine_config)
+    prompts = load_json_file(app_cfg.paths.prompts_config)
     current_snapshot = effective_config_snapshot(
         run_id=run_id,
         model_routing=model_routing,

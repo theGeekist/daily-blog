@@ -5,6 +5,7 @@ import sqlite3
 import sys
 from pathlib import Path
 
+from daily_blog.config import load_app_config
 from daily_blog.core.env import load_env_file
 from daily_blog.core.time_utils import now_iso
 from daily_blog.editorial.evidence import compute_evidence_assessment
@@ -74,11 +75,13 @@ def _load_discussion_signals(conn: sqlite3.Connection, topic_id: str) -> dict[st
 
 def main() -> int:
     load_env_file(Path(".env"))
-    sqlite_path = Path(os.getenv("SQLITE_PATH", DEFAULT_SQLITE_PATH))
-    outlines_path = Path(os.getenv("TOP_OUTLINES_PATH", DEFAULT_TOP_OUTLINES_PATH))
-    research_path = Path(os.getenv("RESEARCH_PACK_PATH", DEFAULT_RESEARCH_PACK_PATH))
-    routing_path = Path(os.getenv("MODEL_ROUTING_CONFIG", DEFAULT_MODEL_ROUTING_PATH))
-    rules_path = Path(os.getenv("RULES_ENGINE_CONFIG", DEFAULT_RULES_ENGINE_PATH))
+    project_root = Path(__file__).resolve().parent
+    app_cfg = load_app_config(project_root=project_root, environ=os.environ)
+    sqlite_path = app_cfg.paths.sqlite_path
+    outlines_path = app_cfg.paths.top_outlines_path
+    research_path = app_cfg.paths.research_pack_path
+    routing_path = app_cfg.paths.model_routing_config
+    rules_path = app_cfg.paths.rules_engine_config
 
     if not sqlite_path.exists():
         print(f"SQLite DB not found: {sqlite_path}", file=sys.stderr)
@@ -145,7 +148,7 @@ def main() -> int:
             if int(fetched_ok) == 1
         ]
 
-        static_only = os.getenv("EDITORIAL_STATIC_ONLY", "0") == "1"
+        static_only = app_cfg.editorial.static_only
         discussion_signals = _load_discussion_signals(conn, str(topic_id))
         if bool(assessment.get("output_suppressed")):
             package = blocked_editorial_package(label, why, evidence_reasons)

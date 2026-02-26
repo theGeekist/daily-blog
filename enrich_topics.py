@@ -6,6 +6,7 @@ import sqlite3
 import sys
 from pathlib import Path
 
+from daily_blog.config import load_app_config
 from daily_blog.core.env import load_env_file
 from daily_blog.core.time_utils import now_iso
 from daily_blog.enrichment.discussion import harvest_discussion_receipts
@@ -51,7 +52,9 @@ def _coerce_int(value: object, default: int = 0) -> int:
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     load_env_file(Path(".env"))
-    sqlite_path = Path(os.getenv("SQLITE_PATH", DEFAULT_SQLITE_PATH))
+    project_root = Path(__file__).resolve().parent
+    app_cfg = load_app_config(project_root=project_root, environ=os.environ)
+    sqlite_path = app_cfg.paths.sqlite_path
     if not sqlite_path.exists():
         print(f"SQLite DB not found: {sqlite_path}", file=sys.stderr)
         return 2
@@ -85,10 +88,10 @@ def main() -> int:
 
     rows_written = 0
     now = now_iso()
-    timeout_seconds = int(os.getenv("ENRICH_FETCH_TIMEOUT_SECONDS", "10"))
-    discovered_limit = int(os.getenv("ENRICH_DISCOVER_LIMIT", "10"))
-    max_known_claim_urls = int(os.getenv("ENRICH_MAX_KNOWN_CLAIM_URLS", "24"))
-    max_topics = int(os.getenv("ENRICH_MAX_TOPICS", "0"))
+    timeout_seconds = app_cfg.enrichment.fetch_timeout_seconds
+    discovered_limit = app_cfg.enrichment.discover_limit
+    max_known_claim_urls = app_cfg.enrichment.max_known_claim_urls
+    max_topics = app_cfg.enrichment.max_topics
     processed_topics = 0
     for topic_id, label, keywords_json in topic_rows:
         if max_topics > 0 and processed_topics >= max_topics:
