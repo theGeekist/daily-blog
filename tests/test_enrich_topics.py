@@ -107,12 +107,18 @@ class TestEnrichTopics(unittest.TestCase):
         env = {
             **os.environ,
             "SQLITE_PATH": str(self.db),
+            "ENRICH_SKIP_MODEL": "1",
+            "ENRICH_DISCOVER_LIMIT": "0",
+            "ENRICH_FETCH_RETRIES": "0",
+            "ENRICH_FETCH_TIMEOUT_SECONDS": "2",
+            "ENRICH_MAX_TOPICS": "1",
         }
         proc = subprocess.run(
             ["python3", "enrich_topics.py"],
             env=env,
             capture_output=True,
             text=True,
+            timeout=30,
         )
         self.assertEqual(proc.returncode, 0, msg=proc.stderr + proc.stdout)
 

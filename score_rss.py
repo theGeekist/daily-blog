@@ -9,11 +9,8 @@ from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path
 
+from daily_blog.config import load_app_config
 from daily_blog.core.env import load_env_file
-
-DEFAULT_SQLITE_PATH = "./data/daily-blog.db"
-DEFAULT_CONFIG_PATH = "./config/rules-engine.json"
-DEFAULT_BOARD_PATH = "./data/daily_board.md"
 
 
 @dataclass
@@ -381,10 +378,12 @@ def write_board(path: Path, run_id: str, selected: list[dict]) -> None:
 
 def main() -> int:
     load_env_file(Path(".env"))
+    project_root = Path(__file__).resolve().parent
+    app_cfg = load_app_config(project_root=project_root, environ=os.environ)
 
-    sqlite_path = Path(os.getenv("SQLITE_PATH", DEFAULT_SQLITE_PATH))
-    config_path = Path(os.getenv("RULES_ENGINE_CONFIG", DEFAULT_CONFIG_PATH))
-    board_path = Path(os.getenv("DAILY_BOARD_PATH", DEFAULT_BOARD_PATH))
+    sqlite_path = app_cfg.paths.sqlite_path
+    config_path = app_cfg.paths.rules_engine_config
+    board_path = app_cfg.paths.daily_board_path
 
     try:
         cfg = read_config(config_path)

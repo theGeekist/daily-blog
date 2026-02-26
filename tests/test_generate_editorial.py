@@ -6,6 +6,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from daily_blog.editorial.model_io import build_editorial_prompt
+
 
 class TestGenerateEditorial(unittest.TestCase):
     def setUp(self) -> None:
@@ -46,6 +48,23 @@ class TestGenerateEditorial(unittest.TestCase):
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE discussion_receipts (
+                topic_id TEXT NOT NULL,
+                source_url TEXT NOT NULL,
+                platform TEXT NOT NULL,
+                query_used TEXT NOT NULL,
+                receipt_text TEXT NOT NULL,
+                comment_count INTEGER NOT NULL,
+                problem_statements_json TEXT NOT NULL,
+                solution_statements_json TEXT NOT NULL,
+                model_route_used TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                PRIMARY KEY (topic_id, source_url)
+            )
+            """
+        )
 
         conn.execute(
             """
@@ -81,6 +100,26 @@ class TestGenerateEditorial(unittest.TestCase):
                 "low",
                 1,
                 "2026-02-17T08:05:00+00:00",
+            ),
+        )
+        conn.execute(
+            """
+            INSERT INTO discussion_receipts (
+                topic_id, source_url, platform, query_used, receipt_text, comment_count,
+                problem_statements_json, solution_statements_json, model_route_used, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "ai",
+                "https://news.ycombinator.com/item?id=8863",
+                "hackernews",
+                "dropbox sync thread",
+                "users discuss sync issues and alternatives",
+                20,
+                json.dumps(["Offline workflows still need portable data movement."]),
+                json.dumps(["Use rsync-style workflows and verify backup integrity."]),
+                "discussion-signals:opencode:openai/gpt-5.2",
+                "2026-02-24T08:05:00+00:00",
             ),
         )
         conn.commit()
@@ -124,6 +163,9 @@ class TestGenerateEditorial(unittest.TestCase):
         self.assertEqual(data[0]["topic_id"], "ai")
         self.assertGreaterEqual(len(data[0]["sources"]), 1)
         self.assertGreaterEqual(len(data[0]["checklist"]), 1)
+        self.assertIn("discussion_signals", data[0])
+        self.assertGreaterEqual(len(data[0]["discussion_signals"]["problem_statements"]), 1)
+        self.assertGreaterEqual(len(data[0]["discussion_signals"]["solution_statements"]), 1)
 
         conn = sqlite3.connect(self.db)
         row = conn.execute(
@@ -149,6 +191,26 @@ class TestGenerateEditorial(unittest.TestCase):
         self.assertTrue(angle.strip())
         self.assertTrue(audience.strip())
         self.assertTrue(model_route_used.strip())
+
+    def test_build_editorial_prompt_includes_discussion_signals(self) -> None:
+        prompt = build_editorial_prompt(
+            topic_label="Artificial Intelligence",
+            why_it_matters="Rapid model quality shifts change decisions.",
+            time_horizon="immediate",
+            validated_sources=[
+                {
+                    "domain": "example.com",
+                    "credibility_guess": "medium",
+                    "url": "https://example.com/report",
+                }
+            ],
+            problem_statements=["Teams cannot validate claims quickly enough."],
+            solution_statements=["Adopt verification checkpoints tied to source evidence."],
+        )
+        self.assertIn("discussion_derived_problems", prompt)
+        self.assertIn("discussion_derived_solutions", prompt)
+        self.assertIn("Teams cannot validate claims quickly enough.", prompt)
+        self.assertIn("Adopt verification checkpoints tied to source evidence.", prompt)
 
 
 if __name__ == "__main__":

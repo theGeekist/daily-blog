@@ -10,11 +10,11 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from daily_blog.config import load_app_config
 from daily_blog.core.env import load_env_file
 from daily_blog.core.time_utils import now_iso
 from orchestrator_utils import ModelCallError, call_model
 
-DEFAULT_SQLITE_PATH = "./data/daily-blog.db"
 EXTRACTOR_STAGE = "extractor"
 
 logger = logging.getLogger(__name__)
@@ -235,14 +235,16 @@ def upsert_claims(conn: sqlite3.Connection, rows: list[tuple]) -> int:
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     load_env_file(Path(".env"))
-    sqlite_path = Path(os.getenv("SQLITE_PATH", DEFAULT_SQLITE_PATH))
+    project_root = Path(__file__).resolve().parent
+    app_cfg = load_app_config(project_root=project_root, environ=os.environ)
+    sqlite_path = app_cfg.paths.sqlite_path
     if not sqlite_path.exists():
         print(f"SQLite DB not found: {sqlite_path}", file=sys.stderr)
         return 2
 
     conn = sqlite3.connect(sqlite_path)
     init_claims_table(conn)
-    max_mentions = int(os.getenv("EXTRACT_MAX_MENTIONS", "300"))
+    max_mentions = app_cfg.extraction.max_mentions
     mentions = read_mentions(conn, limit=max_mentions)
     now = now_iso()
 

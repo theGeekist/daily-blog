@@ -72,6 +72,8 @@ def verify_source_fetch(url: str, timeout_seconds: int = 8) -> bool:
 
 
 def discover_web_sources(topic_label: str, query_terms: list[str], limit: int = 12) -> list[str]:
+    if limit <= 0:
+        return []
     query = " ".join([topic_label] + query_terms[:6]).strip()
     if not query:
         return []

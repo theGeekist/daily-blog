@@ -10,13 +10,10 @@ import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
 
+from daily_blog.config import load_app_config
 from daily_blog.core.env import load_env_file
 from daily_blog.core.time_utils import utc_now_iso
 
-DEFAULT_FEEDS_FILE = "feeds.txt"
-DEFAULT_SQLITE_PATH = "./data/daily-blog.db"
-DEFAULT_OUTPUT_JSONL = "./data/mentions.jsonl"
-DEFAULT_MAX_ITEMS = 50
 USER_AGENT = "daily-blog-rss-ingest/0.1 (+local)"
 
 
@@ -206,16 +203,13 @@ def upsert_mentions(conn: sqlite3.Connection, mentions: list[Mention]) -> int:
 
 def main() -> int:
     load_env_file(Path(".env"))
+    project_root = Path(__file__).resolve().parent
+    app_cfg = load_app_config(project_root=project_root, environ=os.environ)
 
-    feeds_file = Path(os.getenv("FEEDS_FILE", DEFAULT_FEEDS_FILE))
-    sqlite_path = Path(os.getenv("SQLITE_PATH", DEFAULT_SQLITE_PATH))
-    output_jsonl = Path(os.getenv("OUTPUT_JSONL", DEFAULT_OUTPUT_JSONL))
-
-    try:
-        max_items = int(os.getenv("MAX_ITEMS_PER_FEED", str(DEFAULT_MAX_ITEMS)))
-    except ValueError:
-        print("Invalid MAX_ITEMS_PER_FEED; must be an integer", file=sys.stderr)
-        return 2
+    feeds_file = app_cfg.paths.feeds_file
+    sqlite_path = app_cfg.paths.sqlite_path
+    output_jsonl = app_cfg.paths.output_jsonl
+    max_items = app_cfg.ingest.max_items_per_feed
 
     try:
         feeds = read_feeds(feeds_file)

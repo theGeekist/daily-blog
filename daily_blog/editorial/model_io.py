@@ -67,6 +67,8 @@ def build_editorial_prompt(
     why_it_matters: str,
     time_horizon: str,
     validated_sources: list[dict[str, Any]],
+    problem_statements: list[str] | None = None,
+    solution_statements: list[str] | None = None,
 ) -> str:
     source_lines = [
         f"- {src['domain']} | {src['credibility_guess']} | {src['url']}"
@@ -74,6 +76,14 @@ def build_editorial_prompt(
     ]
     if not source_lines:
         source_lines = ["- no validated sources available"]
+
+    problem_lines = [f"- {item}" for item in (problem_statements or []) if item.strip()]
+    if not problem_lines:
+        problem_lines = ["- no discussion-derived problems available"]
+
+    solution_lines = [f"- {item}" for item in (solution_statements or []) if item.strip()]
+    if not solution_lines:
+        solution_lines = ["- no discussion-derived solutions available"]
 
     return "\n".join(
         [
@@ -90,6 +100,10 @@ def build_editorial_prompt(
             f"- time_horizon: {time_horizon}",
             "- validated_sources:",
             *source_lines,
+            "- discussion_derived_problems:",
+            *problem_lines,
+            "- discussion_derived_solutions:",
+            *solution_lines,
             "",
             "Required JSON shape:",
             "{",
@@ -117,6 +131,8 @@ def build_editorial_prompt(
                 "- verification_checklist should focus on factual correctness and "
                 "source-backed claims."
             ),
+            "- Outline and narrative must address the strongest discussion-derived problems.",
+            "- Solutions should be framed as hypotheses and validated against sources.",
         ]
     )
 

@@ -7,12 +7,11 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from daily_blog.config import load_app_config
 from daily_blog.core.env import load_env_file
 from daily_blog.core.time_utils import now_iso
 from orchestrator_utils import ModelCallError, call_model
 
-DEFAULT_SQLITE_PATH = "./data/daily-blog.db"
-DEFAULT_CONFIG_PATH = "./config/rules-engine.json"
 TOPIC_LIFTER_STAGE = "topic_lifter"
 MAX_CLAIMS_PER_BATCH = 200
 
@@ -240,8 +239,10 @@ def assign_topics_fallback(
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     load_env_file(Path(".env"))
-    sqlite_path = Path(os.getenv("SQLITE_PATH", DEFAULT_SQLITE_PATH))
-    config_path = Path(os.getenv("RULES_ENGINE_CONFIG", DEFAULT_CONFIG_PATH))
+    project_root = Path(__file__).resolve().parent
+    app_cfg = load_app_config(project_root=project_root, environ=os.environ)
+    sqlite_path = app_cfg.paths.sqlite_path
+    config_path = app_cfg.paths.rules_engine_config
 
     if not sqlite_path.exists():
         print(f"SQLite DB not found: {sqlite_path}", file=sys.stderr)

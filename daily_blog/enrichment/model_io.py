@@ -36,7 +36,6 @@ SOURCE_ENRICHMENT_SCHEMA: dict[str, Any] = {
     },
 }
 
-
 def build_enrichment_prompt(
     topic_label: str, keywords: list[str], known_sources: list[str], query_terms: list[str]
 ) -> str:
@@ -118,3 +117,102 @@ def fetch_model_sources(
 
     model_name = str(result.get("model_used", "")).strip() or ENRICHMENT_STAGE
     return validated, f"{ENRICHMENT_STAGE}:{model_name}"
+
+
+def build_discussion_signals_prompt(
+    topic_label: str,
+    query_terms: list[str],
+    receipts: list[dict[str, object]],
+) -> str:
+    compact_receipts = [
+        {
+            "platform": str(item.get("platform", "")),
+            "source_url": str(item.get("source_url", "")),
+            "query_used": str(item.get("query_used", "")),
+            "comment_count": item.get("comment_count", 0),
+            "receipt_text": str(item.get("receipt_text", ""))[:4000],
+        }
+        for item in receipts
+    ]
+    return (
+        "You are extracting grounded research signals from discussion receipts.\n\n"
+        "Rules:\n"
+        "- Use ONLY the provided receipts. Do not invent facts.\n"
+        "- Capture problems people report and solution attempts people suggest.\n"
+        "- Return ONLY JSON matching the schema.\n\n"
+        "Topic:\n"
+        f"{topic_label}\n\n"
+        "Current query terms:\n"
+        f"{json.dumps(query_terms, ensure_ascii=True)}\n\n"
+        "Discussion receipts (query + comments actually fetched):\n"
+        f"{json.dumps(compact_receipts, ensure_ascii=True)}\n\n"
+        "Output schema:\n"
+        '{"problem_statements":["..."],"solution_statements":["..."],"query_terms":["..."]}'
+    )
+
+
+def fetch_discussion_signals(
+    *,
+    topic_id: str,
+    topic_label: str,
+    query_terms: list[str],
+    receipts: list[dict[str, object]],
+) -> tuple[dict[str, list[str]], str]:
+    empty = {"problem_statements": [], "solution_statements": [], "query_terms": []}
+    if not receipts:
+        return empty, "no-receipts"
+    if os.getenv("ENRICH_SKIP_MODEL", "0") == "1":
+        return empty, "model-skipped"
+
+    prompt = build_discussion_signals_prompt(
+        topic_label=topic_label,
+        query_terms=query_terms,
+        receipts=receipts,
+    )
+    try:
+        # OpenCode CLI providers can occasionally emit list-wrapped JSON;
+        # keep schema validation in-process for resilience.
+        result = call_model(
+            stage_name=ENRICHMENT_STAGE,
+            prompt=prompt,
+            schema=None,
+        )
+    except ModelCallError as exc:
+        logger.warning("Discussion signal extraction failed for topic_id=%s: %s", topic_id, exc)
+        return empty, "model-failed"
+
+    payload = result.get("content", {})
+    if isinstance(payload, list):
+        object_candidates = [item for item in payload if isinstance(item, dict)]
+        payload = object_candidates[0] if object_candidates else {}
+    if not isinstance(payload, dict):
+        return empty, "model-invalid"
+
+    def _clean_list(name: str, limit: int) -> list[str]:
+        raw = payload.get(name)
+        if not isinstance(raw, list):
+            return []
+        out: list[str] = []
+        seen: set[str] = set()
+        for item in raw:
+            if not isinstance(item, str):
+                continue
+            cleaned = " ".join(item.strip().split())
+            if not cleaned:
+                continue
+            lowered = cleaned.lower()
+            if lowered in seen:
+                continue
+            seen.add(lowered)
+            out.append(cleaned[:280])
+            if len(out) >= limit:
+                break
+        return out
+
+    signals = {
+        "problem_statements": _clean_list("problem_statements", 8),
+        "solution_statements": _clean_list("solution_statements", 8),
+        "query_terms": _clean_list("query_terms", 20),
+    }
+    model_name = str(result.get("model_used", "")).strip() or ENRICHMENT_STAGE
+    return signals, f"discussion-signals:{model_name}"
