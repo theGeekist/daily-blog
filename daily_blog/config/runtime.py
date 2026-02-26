@@ -103,6 +103,9 @@ def _env_json_int_map(environ: Mapping[str, str], key: str) -> dict[str, int]:
 @dataclass(frozen=True)
 class PathsConfig:
     sqlite_path: Path
+    feeds_file: Path
+    output_jsonl: Path
+    daily_board_path: Path
     model_routing_config: Path
     rules_engine_config: Path
     prompts_config: Path
@@ -133,11 +136,30 @@ class EditorialConfig:
 
 
 @dataclass(frozen=True)
+class IngestConfig:
+    max_items_per_feed: int
+
+
+@dataclass(frozen=True)
+class ExtractionConfig:
+    max_mentions: int
+
+
+@dataclass(frozen=True)
+class TopicConfig:
+    force_recurate: bool
+    curator_batch_size: int
+
+
+@dataclass(frozen=True)
 class AppConfig:
     paths: PathsConfig
     pipeline: PipelineConfig
     enrichment: EnrichmentConfig
     editorial: EditorialConfig
+    ingest: IngestConfig
+    extraction: ExtractionConfig
+    topics: TopicConfig
 
 
 def load_app_config(
@@ -147,6 +169,9 @@ def load_app_config(
 ) -> AppConfig:
     paths = PathsConfig(
         sqlite_path=Path(environ.get("SQLITE_PATH", "./data/daily-blog.db")),
+        feeds_file=Path(environ.get("FEEDS_FILE", "./feeds.txt")),
+        output_jsonl=Path(environ.get("OUTPUT_JSONL", "./data/mentions.jsonl")),
+        daily_board_path=Path(environ.get("DAILY_BOARD_PATH", "./data/daily_board.md")),
         model_routing_config=Path(
             environ.get("MODEL_ROUTING_CONFIG", str(project_root / "config" / "model-routing.json"))
         ),
@@ -179,11 +204,24 @@ def load_app_config(
     editorial = EditorialConfig(
         static_only=_env_bool(environ, "EDITORIAL_STATIC_ONLY", default=False),
     )
+    ingest = IngestConfig(
+        max_items_per_feed=_env_int(environ, "MAX_ITEMS_PER_FEED", 50, minimum=1),
+    )
+    extraction = ExtractionConfig(
+        max_mentions=_env_int(environ, "EXTRACT_MAX_MENTIONS", 300, minimum=1),
+    )
+    topics = TopicConfig(
+        force_recurate=_env_bool(environ, "FORCE_TOPIC_RECURATE", default=False),
+        curator_batch_size=_env_int(environ, "TOPIC_CURATOR_BATCH_SIZE", 20, minimum=1),
+    )
     return AppConfig(
         paths=paths,
         pipeline=pipeline,
         enrichment=enrichment,
         editorial=editorial,
+        ingest=ingest,
+        extraction=extraction,
+        topics=topics,
     )
 
 

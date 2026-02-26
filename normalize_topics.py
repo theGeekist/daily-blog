@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from daily_blog.config import load_app_config
 from daily_blog.core.env import load_env_file
 from daily_blog.core.time_utils import now_iso
 from orchestrator_utils import ModelCallError, call_model
@@ -173,14 +174,16 @@ def chunk_topics(rows: list[dict[str, Any]], batch_size: int) -> list[list[dict[
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     load_env_file(Path(".env"))
-    sqlite_path = Path(os.getenv("SQLITE_PATH", DEFAULT_SQLITE_PATH))
+    project_root = Path(__file__).resolve().parent
+    app_cfg = load_app_config(project_root=project_root, environ=os.environ)
+    sqlite_path = app_cfg.paths.sqlite_path
     if not sqlite_path.exists():
         print(f"SQLite DB not found: {sqlite_path}", file=sys.stderr)
         return 2
 
     conn = sqlite3.connect(sqlite_path)
     init_topic_curation_columns(conn)
-    force_recurate = os.getenv("FORCE_TOPIC_RECURATE", "0") == "1"
+    force_recurate = app_cfg.topics.force_recurate
     where_sql = "" if force_recurate else "WHERE tc.normalized_topic_slug = ''"
     rows = conn.execute(
         (
@@ -222,7 +225,7 @@ def main() -> int:
     ]
 
     now = now_iso()
-    batch_size = int(os.getenv("TOPIC_CURATOR_BATCH_SIZE", str(DEFAULT_BATCH_SIZE)))
+    batch_size = app_cfg.topics.curator_batch_size
     routes_used: set[str] = set()
     for batch in chunk_topics(topic_rows, batch_size=batch_size):
         try:
