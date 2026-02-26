@@ -13,7 +13,6 @@ from daily_blog.core.env import load_env_file
 from daily_blog.core.time_utils import now_iso
 from orchestrator_utils import ModelCallError, call_model
 
-DEFAULT_SQLITE_PATH = "./data/daily-blog.db"
 TOPIC_CURATOR_STAGE = "topic_curator"
 DEFAULT_BATCH_SIZE = 8
 

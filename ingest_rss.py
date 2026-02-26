@@ -14,10 +14,6 @@ from daily_blog.config import load_app_config
 from daily_blog.core.env import load_env_file
 from daily_blog.core.time_utils import utc_now_iso
 
-DEFAULT_FEEDS_FILE = "feeds.txt"
-DEFAULT_SQLITE_PATH = "./data/daily-blog.db"
-DEFAULT_OUTPUT_JSONL = "./data/mentions.jsonl"
-DEFAULT_MAX_ITEMS = 50
 USER_AGENT = "daily-blog-rss-ingest/0.1 (+local)"
 
 

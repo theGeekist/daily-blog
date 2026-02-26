@@ -12,8 +12,6 @@ from daily_blog.core.env import load_env_file
 from daily_blog.core.time_utils import now_iso
 from orchestrator_utils import ModelCallError, call_model
 
-DEFAULT_SQLITE_PATH = "./data/daily-blog.db"
-DEFAULT_CONFIG_PATH = "./config/rules-engine.json"
 TOPIC_LIFTER_STAGE = "topic_lifter"
 MAX_CLAIMS_PER_BATCH = 200
 
