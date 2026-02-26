@@ -22,6 +22,29 @@ class TestDiscussionHarvest(unittest.TestCase):
         )
         self.assertEqual(discussion._extract_hn_item_id("https://example.com/item?id=12345"), "")
 
+    def test_env_int_parsing_is_defensive(self) -> None:
+        with patch.dict(
+            "os.environ",
+            {
+                "ENRICH_DISCUSSION_TIMEOUT_SECONDS": "abc",
+                "ENRICH_DISCUSSION_MAX_THREADS": "-7",
+                "ENRICH_DISCUSSION_MAX_COMMENTS": "9999",
+            },
+            clear=False,
+        ):
+            timeout = discussion._env_int(
+                "ENRICH_DISCUSSION_TIMEOUT_SECONDS", 12, minimum=1, maximum=120
+            )
+            max_threads = discussion._env_int(
+                "ENRICH_DISCUSSION_MAX_THREADS", 3, minimum=0, maximum=20
+            )
+            max_comments = discussion._env_int(
+                "ENRICH_DISCUSSION_MAX_COMMENTS", 20, minimum=0, maximum=200
+            )
+        self.assertEqual(timeout, 12)
+        self.assertEqual(max_threads, 0)
+        self.assertEqual(max_comments, 200)
+
     @patch("daily_blog.enrichment.discussion._http_get_json")
     def test_harvest_reddit_discussion(self, mock_get_json) -> None:
         mock_get_json.return_value = [

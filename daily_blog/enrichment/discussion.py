@@ -6,6 +6,19 @@ import urllib.request
 from daily_blog.enrichment.helpers import normalize_url
 
 
+def _env_int(name: str, default: int, *, minimum: int = 0, maximum: int | None = None) -> int:
+    raw = os.getenv(name, str(default))
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        value = default
+    if value < minimum:
+        value = minimum
+    if maximum is not None and value > maximum:
+        value = maximum
+    return value
+
+
 def _http_get_json(url: str, timeout_seconds: int, user_agent: str) -> object | None:
     try:
         req = urllib.request.Request(
@@ -193,9 +206,9 @@ def _harvest_hn_discussion(
 def harvest_discussion_receipts(
     source_urls: list[str],
 ) -> list[dict[str, object]]:
-    timeout_seconds = int(os.getenv("ENRICH_DISCUSSION_TIMEOUT_SECONDS", "12"))
-    max_threads = int(os.getenv("ENRICH_DISCUSSION_MAX_THREADS", "3"))
-    max_comments = int(os.getenv("ENRICH_DISCUSSION_MAX_COMMENTS", "20"))
+    timeout_seconds = _env_int("ENRICH_DISCUSSION_TIMEOUT_SECONDS", 12, minimum=1, maximum=120)
+    max_threads = _env_int("ENRICH_DISCUSSION_MAX_THREADS", 3, minimum=0, maximum=20)
+    max_comments = _env_int("ENRICH_DISCUSSION_MAX_COMMENTS", 20, minimum=0, maximum=200)
     user_agent = os.getenv(
         "ENRICH_FETCH_USER_AGENT",
         "Mozilla/5.0 (compatible; daily-blog-discussion/0.1; +https://localhost)",
