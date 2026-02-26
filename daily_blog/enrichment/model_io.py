@@ -124,6 +124,16 @@ def build_discussion_signals_prompt(
     query_terms: list[str],
     receipts: list[dict[str, object]],
 ) -> str:
+    compact_receipts = [
+        {
+            "platform": str(item.get("platform", "")),
+            "source_url": str(item.get("source_url", "")),
+            "query_used": str(item.get("query_used", "")),
+            "comment_count": item.get("comment_count", 0),
+            "receipt_text": str(item.get("receipt_text", ""))[:4000],
+        }
+        for item in receipts
+    ]
     return (
         "You are extracting grounded research signals from discussion receipts.\n\n"
         "Rules:\n"
@@ -135,7 +145,7 @@ def build_discussion_signals_prompt(
         "Current query terms:\n"
         f"{json.dumps(query_terms, ensure_ascii=True)}\n\n"
         "Discussion receipts (query + comments actually fetched):\n"
-        f"{json.dumps(receipts, ensure_ascii=True)}\n\n"
+        f"{json.dumps(compact_receipts, ensure_ascii=True)}\n\n"
         "Output schema:\n"
         '{"problem_statements":["..."],"solution_statements":["..."],"query_terms":["..."]}'
     )

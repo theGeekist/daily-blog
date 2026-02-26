@@ -26,12 +26,12 @@ def call_model(stage_name: str, prompt: str, schema: dict | None = None) -> dict
     if not isinstance(stage_config, dict):
         raise ModelCallError(f"Stage '{stage_name}' not found in {DEFAULT_MODEL_ROUTING_PATH}")
 
-    primary = stage_config.get("primary")
-    fallback = stage_config.get("fallback")
-    candidates = [m for m in (primary, fallback) if isinstance(m, str) and m.strip()]
+    candidates = _candidate_models(stage_config)
 
     if not candidates:
-        raise ModelCallError(f"Stage '{stage_name}' has no usable primary/fallback model")
+        raise ModelCallError(
+            f"Stage '{stage_name}' has no usable primary/fallback/fallbacks model entries"
+        )
 
     failures: list[str] = []
 
@@ -50,8 +50,30 @@ def call_model(stage_name: str, prompt: str, schema: dict | None = None) -> dict
     joined_failures = " | ".join(failures)
     raise ModelCallError(
         "All models failed for stage "
-        f"'{stage_name}' (primary then fallback). Details: {joined_failures}"
+        f"'{stage_name}' (primary then fallback chain). Details: {joined_failures}"
     )
+
+
+def _candidate_models(stage_config: dict[str, Any]) -> list[str]:
+    primary = stage_config.get("primary")
+    fallback = stage_config.get("fallback")
+    fallbacks = stage_config.get("fallbacks")
+
+    candidates: list[str] = []
+    for model in (primary, fallback):
+        if isinstance(model, str) and model.strip():
+            candidates.append(model.strip())
+
+    if isinstance(fallbacks, str):
+        if fallbacks.strip():
+            candidates.append(fallbacks.strip())
+    elif isinstance(fallbacks, list):
+        for model in fallbacks:
+            if isinstance(model, str) and model.strip():
+                candidates.append(model.strip())
+
+    # Preserve order and dedupe.
+    return list(dict.fromkeys(candidates))
 
 
 def _load_model_routing(config_path: Path) -> dict[str, Any]:

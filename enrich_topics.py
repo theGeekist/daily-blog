@@ -141,10 +141,13 @@ def main() -> int:
             query_terms=query_terms,
             receipts=receipts,
         )
+        existing_terms = {term.lower() for term in query_terms}
         for term in discussion_signals["query_terms"]:
-            lowered = term.lower()
-            if lowered not in query_terms:
-                query_terms.append(lowered)
+            lowered = term.strip().lower()
+            if not lowered or lowered in existing_terms:
+                continue
+            query_terms.append(lowered)
+            existing_terms.add(lowered)
         query_terms = query_terms[:30]
 
         discovered_urls = discover_web_sources(
