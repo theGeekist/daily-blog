@@ -1,58 +1,16 @@
 import os
 import sqlite3
 import subprocess
-import tempfile
 import unittest
-from pathlib import Path
+
+from tests.fixtures import TestBase, make_test_db
 
 
-class TestEnrichTopics(unittest.TestCase):
+class TestEnrichTopics(TestBase):
     def setUp(self) -> None:
-        self.tmp = tempfile.TemporaryDirectory()
-        self.root = Path(self.tmp.name)
-        self.db = self.root / "test.db"
+        super().setUp()
 
-        conn = sqlite3.connect(self.db)
-        conn.execute(
-            """
-            CREATE TABLE topic_clusters (
-                topic_id TEXT PRIMARY KEY,
-                parent_topic_slug TEXT NOT NULL,
-                parent_topic_label TEXT NOT NULL,
-                why_it_matters TEXT NOT NULL,
-                time_horizon TEXT NOT NULL,
-                claim_count INTEGER NOT NULL,
-                keywords_json TEXT NOT NULL,
-                created_at TEXT NOT NULL
-            )
-            """
-        )
-        conn.execute(
-            """
-            CREATE TABLE claims (
-                claim_id TEXT PRIMARY KEY,
-                entry_id TEXT NOT NULL,
-                headline TEXT NOT NULL,
-                who_cares TEXT NOT NULL,
-                problem_pressure TEXT NOT NULL,
-                proposed_solution TEXT NOT NULL,
-                evidence_type TEXT NOT NULL,
-                sources_json TEXT NOT NULL,
-                created_at TEXT NOT NULL
-            )
-            """
-        )
-        conn.execute(
-            """
-            CREATE TABLE claim_topic_map (
-                claim_id TEXT NOT NULL,
-                topic_id TEXT NOT NULL,
-                created_at TEXT NOT NULL,
-                PRIMARY KEY (claim_id, topic_id)
-            )
-            """
-        )
-
+        conn = make_test_db(self.db, ["topic_clusters", "claims", "claim_topic_map"])
         conn.execute(
             """
             INSERT INTO topic_clusters (
@@ -99,9 +57,6 @@ class TestEnrichTopics(unittest.TestCase):
         )
         conn.commit()
         conn.close()
-
-    def tearDown(self) -> None:
-        self.tmp.cleanup()
 
     def test_enrich_topics_citation_validity(self) -> None:
         env = {

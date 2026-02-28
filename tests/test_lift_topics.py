@@ -1,34 +1,18 @@
 import os
 import sqlite3
 import subprocess
-import tempfile
 import unittest
 from pathlib import Path
 
+from tests.fixtures import TestBase, make_test_db
 
-class TestLiftTopics(unittest.TestCase):
+
+class TestLiftTopics(TestBase):
     def setUp(self) -> None:
-        self.tmp = tempfile.TemporaryDirectory()
-        self.root = Path(self.tmp.name)
-        self.db = self.root / "test.db"
+        super().setUp()
         self.config = Path.cwd() / "config" / "rules-engine.json"
 
-        conn = sqlite3.connect(self.db)
-        conn.execute(
-            """
-            CREATE TABLE claims (
-                claim_id TEXT PRIMARY KEY,
-                entry_id TEXT NOT NULL,
-                headline TEXT NOT NULL,
-                who_cares TEXT NOT NULL,
-                problem_pressure TEXT NOT NULL,
-                proposed_solution TEXT NOT NULL,
-                evidence_type TEXT NOT NULL,
-                sources_json TEXT NOT NULL,
-                created_at TEXT NOT NULL
-            )
-            """
-        )
+        conn = make_test_db(self.db, ["claims"])
         conn.executemany(
             """
             INSERT INTO claims (
@@ -63,9 +47,6 @@ class TestLiftTopics(unittest.TestCase):
         )
         conn.commit()
         conn.close()
-
-    def tearDown(self) -> None:
-        self.tmp.cleanup()
 
     def test_lift_topics_stability(self) -> None:
         env = {

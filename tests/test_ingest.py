@@ -1,16 +1,14 @@
 import os
 import sqlite3
 import subprocess
-import tempfile
 import unittest
-from pathlib import Path
+
+from tests.fixtures import TestBase
 
 
-class TestIngest(unittest.TestCase):
+class TestIngest(TestBase):
     def setUp(self) -> None:
-        self.tmp = tempfile.TemporaryDirectory()
-        self.root = Path(self.tmp.name)
-        self.db = self.root / "test.db"
+        super().setUp()
         self.feeds_file = self.root / "feeds.txt"
         self.output_jsonl = self.root / "mentions.jsonl"
 
@@ -32,9 +30,6 @@ class TestIngest(unittest.TestCase):
 </rss>""",
             encoding="utf-8",
         )
-
-    def tearDown(self) -> None:
-        self.tmp.cleanup()
 
     def test_ingest_from_local_file_url(self) -> None:
         # Use file:// URL to test ingestion without network

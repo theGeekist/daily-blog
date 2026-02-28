@@ -2,70 +2,23 @@ import json
 import os
 import sqlite3
 import subprocess
-import tempfile
 import unittest
 from pathlib import Path
 
-from daily_blog.editorial.model_io import build_editorial_prompt
+from daily_blog.editorial.prompt import build_editorial_prompt
+from tests.fixtures import TestBase, make_test_db
 
 
-class TestGenerateEditorial(unittest.TestCase):
+class TestGenerateEditorial(TestBase):
     def setUp(self) -> None:
-        self.tmp = tempfile.TemporaryDirectory()
-        self.root = Path(self.tmp.name)
-        self.db = self.root / "test.db"
+        super().setUp()
         self.outlines = self.root / "top_outlines.md"
         self.research = self.root / "research_pack.json"
         self.routing = Path.cwd() / "config" / "model-routing.json"
 
-        conn = sqlite3.connect(self.db)
-        conn.execute(
-            """
-            CREATE TABLE topic_clusters (
-                topic_id TEXT PRIMARY KEY,
-                parent_topic_slug TEXT NOT NULL,
-                parent_topic_label TEXT NOT NULL,
-                why_it_matters TEXT NOT NULL,
-                time_horizon TEXT NOT NULL,
-                claim_count INTEGER NOT NULL,
-                keywords_json TEXT NOT NULL,
-                created_at TEXT NOT NULL
-            )
-            """
+        conn = make_test_db(
+            self.db, ["topic_clusters", "enrichment_sources", "discussion_receipts"]
         )
-        conn.execute(
-            """
-            CREATE TABLE enrichment_sources (
-                topic_id TEXT NOT NULL,
-                query_terms_json TEXT NOT NULL,
-                domain TEXT NOT NULL,
-                url TEXT NOT NULL,
-                stance TEXT NOT NULL,
-                credibility_guess TEXT NOT NULL,
-                fetched_ok INTEGER NOT NULL,
-                created_at TEXT NOT NULL,
-                PRIMARY KEY (topic_id, url)
-            )
-            """
-        )
-        conn.execute(
-            """
-            CREATE TABLE discussion_receipts (
-                topic_id TEXT NOT NULL,
-                source_url TEXT NOT NULL,
-                platform TEXT NOT NULL,
-                query_used TEXT NOT NULL,
-                receipt_text TEXT NOT NULL,
-                comment_count INTEGER NOT NULL,
-                problem_statements_json TEXT NOT NULL,
-                solution_statements_json TEXT NOT NULL,
-                model_route_used TEXT NOT NULL,
-                created_at TEXT NOT NULL,
-                PRIMARY KEY (topic_id, source_url)
-            )
-            """
-        )
-
         conn.execute(
             """
             INSERT INTO topic_clusters (
@@ -124,9 +77,6 @@ class TestGenerateEditorial(unittest.TestCase):
         )
         conn.commit()
         conn.close()
-
-    def tearDown(self) -> None:
-        self.tmp.cleanup()
 
     def test_generate_editorial_output_structure(self) -> None:
         env = {
