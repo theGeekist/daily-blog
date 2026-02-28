@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Any
 
 from daily_blog.core.env import load_env_file
-from daily_blog.core.time_utils import utc_now_iso
+from daily_blog.core.time_utils import now_iso
 
 DEFAULT_SQLITE_PATH = "./data/daily-blog.db"
 DEFAULT_REPORT_PATH = "./data/soak_test_report.json"
@@ -46,7 +46,7 @@ def run_single_pipeline() -> dict[str, Any]:
 
     result = {
         "run_id": datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ"),
-        "timestamp": utc_now_iso(),
+        "timestamp": now_iso(),
         "success": False,
         "returncode": None,
         "stdout": "",
@@ -249,7 +249,7 @@ def generate_report(
         "baseline_available": bool(baseline),
         "detailed_runs": runs,
         "comparisons": comparisons,
-        "generated_at": utc_now_iso(),
+        "generated_at": now_iso(),
     }
 
 

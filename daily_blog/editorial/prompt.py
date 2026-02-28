@@ -43,7 +43,11 @@ def load_model_route(path: Path) -> str:
     if not path.exists():
         return "codex-5.3"
     obj = json.loads(path.read_text(encoding="utf-8"))
-    return str(obj.get(EDITORIAL_STAGE, {}).get("primary", "codex-5.3"))
+    stage_cfg = obj.get(EDITORIAL_STAGE, {})
+    if not isinstance(stage_cfg, dict):
+        return "codex-5.3"
+    primary = str(stage_cfg.get("primary", "")).strip()
+    return primary or "codex-5.3"
 
 
 def load_rules(path: Path) -> dict[str, Any]:

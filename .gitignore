@@ -25,3 +25,14 @@ data/research_pack.json
 # Node dependencies
 node_modules/
 feeds.txt.claude/
+
+# IDE
+.vscode/
+
+# Python packaging
+daily_blog.egg-info/
+uv.lock
+
+# Generated output data
+data/candidates/
+data/backups/

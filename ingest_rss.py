@@ -12,7 +12,7 @@ from pathlib import Path
 
 from daily_blog.config import load_app_config
 from daily_blog.core.env import load_env_file
-from daily_blog.core.time_utils import utc_now_iso
+from daily_blog.core.time_utils import now_iso
 
 USER_AGENT = "daily-blog-rss-ingest/0.1 (+local)"
 
@@ -228,7 +228,7 @@ def main() -> int:
     all_mentions: list[Mention] = []
     failed = 0
     for url in feeds:
-        fetched_at = utc_now_iso()
+        fetched_at = now_iso()
         try:
             payload = fetch_feed(url)
             mentions = parse_feed(payload, url, max_items, fetched_at)

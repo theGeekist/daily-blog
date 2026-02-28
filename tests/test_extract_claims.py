@@ -2,32 +2,16 @@ import json
 import os
 import sqlite3
 import subprocess
-import tempfile
 import unittest
-from pathlib import Path
+
+from tests.fixtures import TestBase, make_test_db
 
 
-class TestExtractClaims(unittest.TestCase):
+class TestExtractClaims(TestBase):
     def setUp(self) -> None:
-        self.tmp = tempfile.TemporaryDirectory()
-        self.root = Path(self.tmp.name)
-        self.db = self.root / "test.db"
+        super().setUp()
 
-        conn = sqlite3.connect(self.db)
-        conn.execute(
-            """
-            CREATE TABLE mentions (
-                entry_id TEXT PRIMARY KEY,
-                source TEXT NOT NULL,
-                feed_url TEXT NOT NULL,
-                title TEXT,
-                url TEXT,
-                published TEXT,
-                summary TEXT,
-                fetched_at TEXT NOT NULL
-            )
-            """
-        )
+        conn = make_test_db(self.db, ["mentions"])
         conn.executemany(
             """
             INSERT INTO mentions (
@@ -59,9 +43,6 @@ class TestExtractClaims(unittest.TestCase):
         )
         conn.commit()
         conn.close()
-
-    def tearDown(self) -> None:
-        self.tmp.cleanup()
 
     def test_extract_claims_schema_validation(self) -> None:
         env = {

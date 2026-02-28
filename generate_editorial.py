@@ -9,7 +9,7 @@ from daily_blog.config import load_app_config
 from daily_blog.core.env import load_env_file
 from daily_blog.core.time_utils import now_iso
 from daily_blog.editorial.evidence import compute_evidence_assessment
-from daily_blog.editorial.model_io import (
+from daily_blog.editorial.prompt import (
     EDITORIAL_RESPONSE_SCHEMA,
     EDITORIAL_STAGE,
     build_editorial_prompt,

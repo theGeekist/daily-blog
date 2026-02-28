@@ -1,34 +1,19 @@
 import os
 import sqlite3
 import subprocess
-import tempfile
 import unittest
 from pathlib import Path
 
+from tests.fixtures import TestBase, make_test_db
 
-class TestScoringBaseline(unittest.TestCase):
+
+class TestScoringBaseline(TestBase):
     def setUp(self) -> None:
-        self.tmp = tempfile.TemporaryDirectory()
-        self.root = Path(self.tmp.name)
-        self.db = self.root / "test.db"
+        super().setUp()
         self.board = self.root / "daily_board.md"
         self.config = Path.cwd() / "config" / "rules-engine.json"
 
-        conn = sqlite3.connect(self.db)
-        conn.execute(
-            """
-            CREATE TABLE mentions (
-                entry_id TEXT PRIMARY KEY,
-                source TEXT NOT NULL,
-                feed_url TEXT NOT NULL,
-                title TEXT,
-                url TEXT,
-                published TEXT,
-                summary TEXT,
-                fetched_at TEXT NOT NULL
-            )
-            """
-        )
+        conn = make_test_db(self.db, ["mentions"])
         conn.executemany(
             """
             INSERT INTO mentions (
@@ -60,9 +45,6 @@ class TestScoringBaseline(unittest.TestCase):
         )
         conn.commit()
         conn.close()
-
-    def tearDown(self) -> None:
-        self.tmp.cleanup()
 
     def run_score_script(self, db_path: Path | None = None) -> subprocess.CompletedProcess:
         env = {

@@ -1,13 +1,6 @@
 from typing import Any
 
-
-def credibility_score(credibility_guess: str) -> int:
-    guess = str(credibility_guess or "").strip().lower()
-    if guess == "high":
-        return 3
-    if guess == "medium":
-        return 2
-    return 1
+from daily_blog.enrichment.helpers import credibility_rank
 
 
 def compute_evidence_assessment(
@@ -30,7 +23,11 @@ def compute_evidence_assessment(
     fetched_count = len(fetched_rows)
     fetched_ratio = (fetched_count / total_sources) if total_sources else 0.0
     avg_cred = (
-        sum(credibility_score(str(row[3] or "")) for row in fetched_rows) / fetched_count
+        sum(
+            credibility_rank(str(row[3] or "").strip().lower())
+            for row in fetched_rows
+        )
+        / fetched_count
         if fetched_count
         else 0.0
     )
