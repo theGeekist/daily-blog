@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS claims (
     proposed_solution TEXT NOT NULL,
     evidence_type TEXT NOT NULL,
     sources_json TEXT NOT NULL,
+    model_route_used TEXT,
     created_at TEXT NOT NULL
 )
 """

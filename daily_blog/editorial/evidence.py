@@ -23,7 +23,11 @@ def compute_evidence_assessment(
     fetched_count = len(fetched_rows)
     fetched_ratio = (fetched_count / total_sources) if total_sources else 0.0
     avg_cred = (
-        sum(credibility_rank(str(row[3] or "")) for row in fetched_rows) / fetched_count
+        sum(
+            credibility_rank(str(row[3] or "").strip().lower())
+            for row in fetched_rows
+        )
+        / fetched_count
         if fetched_count
         else 0.0
     )
